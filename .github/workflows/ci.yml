@@ -81,9 +81,12 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
       - run: npm ci
       - name: Install Playwright (same version as the dev environment)
+        timeout-minutes: 5
+        # No --with-deps: that runs apt-get for extra fonts, which made the job fail on runner DNS outages.
+        # GitHub's Ubuntu runners already ship Chrome and the system libraries headless Chromium needs.
         run: |
           npm install -g playwright@1.63.0
-          npx -y playwright@1.63.0 install --with-deps chromium
+          npx -y playwright@1.63.0 install chromium
       - name: Build and start admin and web
         run: |
           npm run build --workspace apps/admin
