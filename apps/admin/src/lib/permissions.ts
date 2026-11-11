@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   "analytics.read": ["admin", "reviewer", "support"],
   "deal.monitor": ["admin", "support"],
   "document.review": ["admin", "reviewer"],
+  "services.manage": ["admin", "support"],
 } as const satisfies Record<string, readonly StaffRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -45,6 +46,8 @@ export const NAV: readonly NavItem[] = [
   { href: "/users", label: "Users", permission: "user.manage" },
   { href: "/deals", label: "Deals monitor", permission: "deal.monitor" },
   { href: "/support", label: "Support cases", permission: "support.handle" },
+  { href: "/services/providers", label: "Service providers", permission: "services.manage" },
+  { href: "/services/referrals", label: "Referral requests", permission: "services.manage" },
   { href: "/audit", label: "Audit log", permission: "audit.read" },
   { href: "/security", label: "Account security", permission: null },
 ];

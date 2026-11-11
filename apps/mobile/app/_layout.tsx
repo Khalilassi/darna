@@ -110,6 +110,9 @@ function Navigation() {
         <Stack.Screen name="market" options={{ title: t("market.title") }} />
         <Stack.Screen name="saved-searches/index" options={{ title: t("savedSearch.title") }} />
         <Stack.Screen name="saved-searches/[id]" options={{ title: t("savedSearch.resultsTitle") }} />
+        <Stack.Screen name="services/index" options={{ title: t("services.title") }} />
+        <Stack.Screen name="services/request/[providerId]" options={{ presentation: "modal", title: t("services.request.title") }} />
+        <Stack.Screen name="services/referrals" options={{ title: t("services.referrals.title") }} />
       </Stack>
     </PushProvider>
   );

@@ -20,6 +20,14 @@ export type SupportCase = Schemas["AdminCaseOut"];
 export type SupportStatus = Schemas["SupportStatus"];
 export type CaseUpdate = Schemas["CaseUpdate"];
 export type AuditEntry = Schemas["AuditOut"];
+export type ServiceProvider = Schemas["AdminProviderOut"];
+export type ServiceCategory = Schemas["ServiceCategory"];
+export type ProviderIn = Schemas["ProviderIn"];
+export type ProviderPatch = Schemas["ProviderPatch"];
+export type ServiceReferral = Schemas["AdminReferralOut"];
+export type ReferralStatus = Schemas["ReferralStatus"];
+export type ReferralStatusIn = Schemas["ReferralStatusIn"];
+export type Project = Schemas["ProjectOut"];
 export type Page<T> = { items: T[]; total: number; page: number; page_size: number };
 
 export type Analytics = Schemas["AnalyticsOut"];
@@ -61,6 +69,15 @@ export function makeAdminApi(call: Call) {
     support: (status?: SupportStatus[]) => call((c) => c.GET("/admin/support", { params: { query: { status } } })),
     updateCase: (id: string, body: CaseUpdate) =>
       call((c) => c.PATCH("/admin/support/{case_id}", { params: { path: { case_id: id } }, body })),
+
+    projects: () => call((c) => c.GET("/projects")),
+    serviceProviders: () => call((c) => c.GET("/admin/services/providers")),
+    createProvider: (body: ProviderIn) => call((c) => c.POST("/admin/services/providers", { body })),
+    updateProvider: (id: string, body: ProviderPatch) =>
+      call((c) => c.PATCH("/admin/services/providers/{provider_id}", { params: { path: { provider_id: id } }, body })),
+    serviceReferrals: (status?: ReferralStatus[]) => call((c) => c.GET("/admin/services/referrals", { params: { query: { status } } })),
+    updateReferral: (id: string, body: ReferralStatusIn) =>
+      call((c) => c.PATCH("/admin/services/referrals/{referral_id}", { params: { path: { referral_id: id } }, body })),
 
     audit: (query: { action?: string; entity_id?: string; page?: number; page_size?: number }) =>
       call((c) => c.GET("/admin/audit", { params: { query } })),

@@ -83,6 +83,8 @@ input, select, textarea {
   font: inherit; color: var(--c-text); background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); padding: 6px 8px;
 }
 textarea { resize: vertical; }
+.field-error { color: var(--c-danger); font-size: 12px; }
+[aria-invalid="true"] { border-color: var(--c-danger); }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 0; border-color: var(--c-primary); }
 
 /* Buttons */
@@ -136,6 +138,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 /* Modal */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: var(--space-lg); z-index: 50; }
 .modal { background: var(--c-surface); border-radius: var(--radius-lg); width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: var(--space-xl); box-shadow: 0 20px 50px rgba(0,0,0,.25); outline: none; }
+.modal.modal-wide { width: min(880px, 100%); }
 .modal h2 { font-size: 18px; margin-bottom: var(--space-md); }
 .modal-footer { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-lg); }
 
