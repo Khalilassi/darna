@@ -6,14 +6,14 @@ Legend: P1 next, P2 soon, P3 later.
 - ✅ CI green on GitHub. P1 build/run Docker image; staging deployment plan (no public deploy without approval).
 - ✅ Scheduled worker (done): `python -m app.worker`.
 - ✅ Redis rate limiting; request ids, JSON logs, Prometheus metrics. P3 distributed tracing.
-- P2 Server-computed `allowed_actions` on viewings and checklist items.
-- P2 Localized server validation messages (or field-level codes only).
+- ✅ Server-computed `allowed_actions` on viewings and checklist items (one rule function per resource, used by both the endpoint and the response).
+- ✅ Coded validation errors (`type` per rule + `ctx` limits), localized in the mobile app. P3 same localization in admin/web forms.
 - ✅ Search benchmark + trigram indexes. P3 Postgres full-text search (Arabic + English).
 
 ## Security
 - ✅ Staff MFA (backend + admin screens); account lockout.
 - ✅ Malware scanning (ClamAV), S3 storage with SSE/KMS, key rotation.
-- P2 Penetration test; dependency scanning in CI.
+- ✅ Dependency scanning in CI (pip-audit, npm audit) + Dependabot. P2 Penetration test.
 
 ## Product
 - ✅ Push (backend, mobile registration, deep links, settings). P1 verify on a device with an EAS project.

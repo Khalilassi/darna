@@ -68,8 +68,7 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - Native RTL switching (requires app reload via `I18nManager.forceRTL`) is untested on devices.
 - Native date pickers (Android dialog / iOS sheet), the OS push permission prompt and real push delivery are untested (need a device + EAS project + FCM/APNs credentials).
 - Media URLs come from `DARNA_PUBLIC_BASE_URL`; the mobile app rewrites `localhost` for emulators. Set the env var to a reachable host for device testing.
-- Some `validation_failed` messages are English developer text; Arabic UI shows a generic message for them.
-- Viewing and checklist responses don't include server-computed allowed actions (the client derives them; the server remains authoritative).
+- Validation details carry a `type` code (business rules use `rule_error`) and `ctx` limits; the mobile app localizes them. Types without a translation fall back to the English message (English UI) or a generic message (Arabic UI). Admin and web still show the English text.
 - Rate limiting is per-process (in-memory, with eviction of inactive keys). The worker must be scheduled externally (cron / platform scheduler) or run with `--interval`.
 - Verification queue has no pagination.
 - The dev database used during this session contains extra test records from agent E2E runs; reset with `python seed.py --reset`.

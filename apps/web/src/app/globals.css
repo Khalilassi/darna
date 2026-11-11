@@ -5,7 +5,7 @@ html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-t
    than change the shared tokens, mix each towards --c-text: darker in light mode, lighter in dark mode, so both
    schemes stay >= 4.5:1 on every surface these are used on. */
 :root {
-  --c-text-muted-aa: color-mix(in srgb, var(--c-text-muted-aa) 75%, var(--c-text));
+  --c-text-muted-aa: color-mix(in srgb, var(--c-text-muted) 75%, var(--c-text));
   --c-accent-aa: color-mix(in srgb, var(--c-accent) 70%, var(--c-text));
   --c-warning-aa: color-mix(in srgb, var(--c-warning) 70%, var(--c-text));
   --c-success-aa: color-mix(in srgb, var(--c-success) 80%, var(--c-text));
