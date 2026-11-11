@@ -74,7 +74,9 @@ function List() {
         ListEmptyComponent={
           <EmptyState icon="bookmark-outline" title={t("savedSearch.empty")} body={t("savedSearch.emptyBody")} actionLabel={t("saved.explore")} onAction={() => router.push("/explore")} />
         }
-        renderItem={({ item: s }) => (
+        renderItem={({ item: s }) => {
+          const summary = describeFilters(s.filters, t, lang, { districtName: districtName(s.filters.district_id) });
+          return (
           <Card testID={`saved-search-${s.id}`}>
             <Row style={{ alignItems: "flex-start" }}>
               <View style={{ flex: 1, gap: 4 }}>
@@ -84,7 +86,7 @@ function List() {
                     <Badge tone="primary" label={t("savedSearch.newCount", { count: s.new_since_last_alert })} testID="saved-search-new" />
                   ) : null}
                 </Row>
-                <T variant="caption" tone="muted">{describeFilters(s.filters, t, lang, { districtName: districtName(s.filters.district_id) })}</T>
+                {summary !== s.name ? <T variant="caption" tone="muted">{summary}</T> : null}
                 <T variant="caption" tone="muted">{t("savedSearch.created", { date: formatDate(s.created_at, lang) })}</T>
               </View>
             </Row>
@@ -125,7 +127,8 @@ function List() {
               />
             </Row>
           </Card>
-        )}
+          );
+        }}
       />
       <SearchNameModal
         visible={!!renaming}

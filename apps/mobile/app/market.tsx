@@ -28,7 +28,6 @@ export default function Market() {
 
   return (
     <Screen testID="market-screen" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
-      <T variant="title" accessibilityRole="header">{t("market.title")}</T>
       <T tone="muted">{project ? t("market.subtitle", { project: lang === "ar" ? project.name_ar : project.name_en }) : t("market.subtitleNoProject")}</T>
       <Segmented
         value={purpose}
