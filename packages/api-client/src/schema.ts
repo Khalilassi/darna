@@ -1075,6 +1075,8 @@ export interface components {
         AdminCaseOut: {
             /** Assignee Id */
             assignee_id: string | null;
+            /** Assignee Name */
+            assignee_name?: string | null;
             /** Category */
             category: string;
             /**
@@ -1094,6 +1096,11 @@ export interface components {
              * Format: uuid
              */
             reporter_id: string;
+            /**
+             * Reporter Name
+             * @default
+             */
+            reporter_name: string;
             /** Resolution Note */
             resolution_note: string | null;
             status: components["schemas"]["SupportStatus"];
@@ -1109,6 +1116,8 @@ export interface components {
              * Format: uuid
              */
             buyer_id: string;
+            /** Buyer Name */
+            buyer_name: string;
             /**
              * Id
              * Format: uuid
@@ -1130,6 +1139,8 @@ export interface components {
              * Format: uuid
              */
             owner_id: string;
+            /** Owner Name */
+            owner_name: string;
             status: components["schemas"]["DealStatus"];
             /**
              * Updated At
@@ -1229,6 +1240,35 @@ export interface components {
             assumption?: string | null;
             /** @default seller_provided */
             provenance: components["schemas"]["Provenance"];
+        };
+        /** AnalyticsOut */
+        AnalyticsOut: {
+            /** Claims By Status */
+            claims_by_status: {
+                [key: string]: number;
+            };
+            /** Deals By Status */
+            deals_by_status: {
+                [key: string]: number;
+            };
+            /** Disputes Open */
+            disputes_open: number;
+            /** Listings By Status */
+            listings_by_status: {
+                [key: string]: number;
+            };
+            /** Properties Total */
+            properties_total: number;
+            /** Support Open */
+            support_open: number;
+            /** Users Identity Verified */
+            users_identity_verified: number;
+            /** Users New 30D */
+            users_new_30d: number;
+            /** Users Total */
+            users_total: number;
+            /** Verifications Pending */
+            verifications_pending: number;
         };
         /** AuditOut */
         AuditOut: {
@@ -1346,6 +1386,24 @@ export interface components {
             action: "submit" | "accept" | "waive" | "reopen";
             /** Document Id */
             document_id?: string | null;
+        };
+        /** ClaimBrief */
+        ClaimBrief: {
+            /** Capacity */
+            capacity: string;
+            /**
+             * Claim Id
+             * Format: uuid
+             */
+            claim_id: string;
+            /** Name */
+            name: string;
+            status: components["schemas"]["ClaimStatus"];
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /**
          * ClaimCapacity
@@ -1545,19 +1603,13 @@ export interface components {
         DeliveryStatus: "ready" | "under_construction";
         /** DisputeOut */
         DisputeOut: {
-            /** Challenger */
-            challenger: {
-                [key: string]: unknown;
-            };
+            challenger: components["schemas"]["ClaimBrief"];
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Existing */
-            existing: {
-                [key: string]: unknown;
-            } | null;
+            existing: components["schemas"]["ClaimBrief"] | null;
             /**
              * Id
              * Format: uuid
@@ -1675,6 +1727,11 @@ export interface components {
             id: string;
             /** Type */
             type: string;
+        };
+        /** ExpireOut */
+        ExpireOut: {
+            /** Expired */
+            expired: number;
         };
         /** Fee */
         "Fee-Input": {
@@ -2546,12 +2603,30 @@ export interface components {
          * @enum {string}
          */
         Provenance: "verified" | "seller_provided" | "estimate" | "unknown";
+        /** QueueClaim */
+        QueueClaim: {
+            /** Area Sqm */
+            area_sqm: string;
+            /** Authority Scope */
+            authority_scope: string[];
+            /** Capacity */
+            capacity: string;
+            /** Identity Key */
+            identity_key: string;
+            /** Principal Name */
+            principal_name: string | null;
+            /**
+             * Property Id
+             * Format: uuid
+             */
+            property_id: string;
+            /** Property Type */
+            property_type: string;
+            status: components["schemas"]["ClaimStatus"];
+        };
         /** QueueItem */
         QueueItem: {
-            /** Claim */
-            claim: {
-                [key: string]: unknown;
-            } | null;
+            claim: components["schemas"]["QueueClaim"] | null;
             /** Claim Id */
             claim_id: string | null;
             /**
@@ -3074,7 +3149,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AnalyticsOut"];
                 };
             };
         };
@@ -3147,7 +3222,7 @@ export interface operations {
     disputes_admin_disputes_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["DisputeStatus"] | null;
+                status?: components["schemas"]["DisputeStatus"] | "all";
             };
             header?: never;
             path?: never;
@@ -3313,7 +3388,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ExpireOut"];
                 };
             };
         };

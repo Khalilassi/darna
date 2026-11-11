@@ -28,7 +28,7 @@ const ownershipItem: QueueItem = {
   kind: "ownership",
   status: "under_review",
   claim_id: "55555555-5555-5555-5555-555555555555",
-  claim: { status: "under_review", capacity: "owner", principal_name: null, authority_scope: null, property_id: "p1", identity_key: "MDN:B7:72:12:5", property_type: "apartment", area_sqm: "120.00" },
+  claim: { status: "under_review", capacity: "owner", principal_name: null, authority_scope: [], property_id: "p1", identity_key: "MDN:B7:72:12:5", property_type: "apartment", area_sqm: "120.00" },
 };
 
 const reviewer: Me = {

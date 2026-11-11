@@ -34,6 +34,17 @@
       ],
       "title": "Assignee Id"
      },
+     "assignee_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee Name"
+     },
      "category": {
       "title": "Category",
       "type": "string"
@@ -55,6 +66,11 @@
      "reporter_id": {
       "format": "uuid",
       "title": "Reporter Id",
+      "type": "string"
+     },
+     "reporter_name": {
+      "default": "",
+      "title": "Reporter Name",
       "type": "string"
      },
      "resolution_note": {
@@ -116,6 +132,10 @@
       "title": "Buyer Id",
       "type": "string"
      },
+     "buyer_name": {
+      "title": "Buyer Name",
+      "type": "string"
+     },
      "id": {
       "format": "uuid",
       "title": "Id",
@@ -143,6 +163,10 @@
       "title": "Owner Id",
       "type": "string"
      },
+     "owner_name": {
+      "title": "Owner Name",
+      "type": "string"
+     },
      "status": {
       "$ref": "#/components/schemas/DealStatus"
      },
@@ -159,7 +183,9 @@
      "kind",
      "status",
      "buyer_id",
+     "buyer_name",
      "owner_id",
+     "owner_name",
      "offers",
      "updated_at"
     ],
@@ -433,6 +459,73 @@
      }
     },
     "title": "Amount",
+    "type": "object"
+   },
+   "AnalyticsOut": {
+    "properties": {
+     "claims_by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Claims By Status",
+      "type": "object"
+     },
+     "deals_by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Deals By Status",
+      "type": "object"
+     },
+     "disputes_open": {
+      "title": "Disputes Open",
+      "type": "integer"
+     },
+     "listings_by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Listings By Status",
+      "type": "object"
+     },
+     "properties_total": {
+      "title": "Properties Total",
+      "type": "integer"
+     },
+     "support_open": {
+      "title": "Support Open",
+      "type": "integer"
+     },
+     "users_identity_verified": {
+      "title": "Users Identity Verified",
+      "type": "integer"
+     },
+     "users_new_30d": {
+      "title": "Users New 30D",
+      "type": "integer"
+     },
+     "users_total": {
+      "title": "Users Total",
+      "type": "integer"
+     },
+     "verifications_pending": {
+      "title": "Verifications Pending",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "users_total",
+     "users_identity_verified",
+     "users_new_30d",
+     "properties_total",
+     "listings_by_status",
+     "deals_by_status",
+     "claims_by_status",
+     "verifications_pending",
+     "disputes_open",
+     "support_open"
+    ],
+    "title": "AnalyticsOut",
     "type": "object"
    },
    "AuditOut": {
@@ -783,6 +876,40 @@
      "action"
     ],
     "title": "ChecklistUpdate",
+    "type": "object"
+   },
+   "ClaimBrief": {
+    "properties": {
+     "capacity": {
+      "title": "Capacity",
+      "type": "string"
+     },
+     "claim_id": {
+      "format": "uuid",
+      "title": "Claim Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ClaimStatus"
+     },
+     "user_id": {
+      "format": "uuid",
+      "title": "User Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "claim_id",
+     "user_id",
+     "name",
+     "status",
+     "capacity"
+    ],
+    "title": "ClaimBrief",
     "type": "object"
    },
    "ClaimCapacity": {
@@ -1350,9 +1477,7 @@
    "DisputeOut": {
     "properties": {
      "challenger": {
-      "additionalProperties": true,
-      "title": "Challenger",
-      "type": "object"
+      "$ref": "#/components/schemas/ClaimBrief"
      },
      "created_at": {
       "format": "date-time",
@@ -1362,14 +1487,12 @@
      "existing": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/components/schemas/ClaimBrief"
        },
        {
         "type": "null"
        }
-      ],
-      "title": "Existing"
+      ]
      },
      "id": {
       "format": "uuid",
@@ -1630,6 +1753,19 @@
      "created_at"
     ],
     "title": "EventOut",
+    "type": "object"
+   },
+   "ExpireOut": {
+    "properties": {
+     "expired": {
+      "title": "Expired",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "expired"
+    ],
+    "title": "ExpireOut",
     "type": "object"
    },
    "Fee-Input": {
@@ -4354,19 +4490,75 @@
     "title": "Provenance",
     "type": "string"
    },
-   "QueueItem": {
+   "QueueClaim": {
     "properties": {
-     "claim": {
+     "area_sqm": {
+      "title": "Area Sqm",
+      "type": "string"
+     },
+     "authority_scope": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Authority Scope",
+      "type": "array"
+     },
+     "capacity": {
+      "title": "Capacity",
+      "type": "string"
+     },
+     "identity_key": {
+      "title": "Identity Key",
+      "type": "string"
+     },
+     "principal_name": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "type": "string"
        },
        {
         "type": "null"
        }
       ],
-      "title": "Claim"
+      "title": "Principal Name"
+     },
+     "property_id": {
+      "format": "uuid",
+      "title": "Property Id",
+      "type": "string"
+     },
+     "property_type": {
+      "title": "Property Type",
+      "type": "string"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ClaimStatus"
+     }
+    },
+    "required": [
+     "status",
+     "capacity",
+     "principal_name",
+     "authority_scope",
+     "property_id",
+     "identity_key",
+     "property_type",
+     "area_sqm"
+    ],
+    "title": "QueueClaim",
+    "type": "object"
+   },
+   "QueueItem": {
+    "properties": {
+     "claim": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/QueueClaim"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "claim_id": {
       "anyOf": [
@@ -5749,7 +5941,9 @@
      "200": {
       "content": {
        "application/json": {
-        "schema": {}
+        "schema": {
+         "$ref": "#/components/schemas/AnalyticsOut"
+        }
        }
       },
       "description": "Successful Response"
@@ -5929,7 +6123,8 @@
          "$ref": "#/components/schemas/DisputeStatus"
         },
         {
-         "type": "null"
+         "const": "all",
+         "type": "string"
         }
        ],
        "default": "open",
@@ -6201,7 +6396,9 @@
      "200": {
       "content": {
        "application/json": {
-        "schema": {}
+        "schema": {
+         "$ref": "#/components/schemas/ExpireOut"
+        }
        }
       },
       "description": "Successful Response"

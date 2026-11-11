@@ -94,3 +94,23 @@ def test_support_case(make_user, admin):
     admin.patch(f"/admin/support/{case['id']}", json={"status": "resolved", "assign_to_me": True, "resolution_note": "Suspended"})
     assert u.get("/support/cases").json()[0]["status"] == "resolved"
     assert any(n["type"] == "support_case_updated" for n in u.get("/notifications").json()["items"])
+
+
+def test_admin_typed_responses_and_filters(make_user, admin, project, reviewer):
+    from tests.conftest import approve_pending_claim, register_property
+    owner, challenger = make_user(name="Owner Person"), make_user(name="Challenger Person")
+    r = register_property(owner, project)
+    approve_pending_claim(reviewer, r.json()["claim"]["id"])
+    doc = challenger.upload_doc("ownership_contract")
+    challenger.post(f"/properties/{r.json()['property']['id']}/claims", json={"document_ids": [doc]})
+    d = admin.get("/admin/disputes").json()[0]
+    assert d["challenger"]["name"] == "Challenger Person" and d["existing"]["name"] == "Owner Person"
+    admin.post(f"/admin/disputes/{d['id']}/resolve", json={"outcome": "dismissed", "note": "No evidence"})
+    assert admin.get("/admin/disputes").json() == []
+    assert len(admin.get("/admin/disputes", params={"status": "all"}).json()) == 1
+    q = reviewer.get("/admin/verifications", params={"status": ["submitted", "under_review", "approved", "rejected"]}).json()
+    assert any(i["claim"] and i["claim"]["identity_key"] for i in q)
+    assert admin.post("/admin/maintenance/expire-offers").json() == {"expired": 0}
+    u = make_user(name="Reporter Person")
+    u.post("/support/cases", json={"category": "other", "description": "Something needs attention"})
+    assert admin.get("/admin/support").json()[0]["reporter_name"] == "Reporter Person"

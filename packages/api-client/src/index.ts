@@ -1,6 +1,7 @@
 /**
  * Typed client for the Darna API, generated from the FastAPI OpenAPI schema.
  * Regenerate with `npm run gen:api` after changing backend schemas.
+ * Token refresh/retry on 401 is the responsibility of each app (see each app's auth module).
  */
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
@@ -21,8 +22,6 @@ export class ApiError extends Error {
 export interface ClientOptions {
   baseUrl: string;
   getAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
-  /** Called on 401 for authenticated calls; should refresh tokens and return true to retry once. */
-  onUnauthorized?: () => Promise<boolean>;
   locale?: () => string;
 }
 

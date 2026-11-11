@@ -113,6 +113,17 @@ class DocRef(ORM):
     content_type: str
 
 
+class QueueClaim(BaseModel):
+    status: ClaimStatus
+    capacity: str
+    principal_name: str | None
+    authority_scope: list[str]
+    property_id: uuid.UUID
+    identity_key: str
+    property_type: str
+    area_sqm: str
+
+
 class QueueItem(BaseModel):
     id: uuid.UUID
     kind: VerificationKind
@@ -123,7 +134,7 @@ class QueueItem(BaseModel):
     listing_id: uuid.UUID | None
     note: str | None
     documents: list[DocRef]
-    claim: dict | None
+    claim: QueueClaim | None
     created_at: datetime
 
 
@@ -147,9 +158,9 @@ def verification_queue(status: list[VS] = Query(default=[VS.submitted, VS.under_
             c = db.scalar(select(OwnershipClaim).options(joinedload(OwnershipClaim.property)).where(OwnershipClaim.id == vr.claim_id))
             if c:
                 p = c.property
-                claim = {"status": c.status.value, "capacity": c.capacity.value, "principal_name": c.principal_name,
-                         "authority_scope": c.authority_scope, "property_id": str(p.id), "identity_key": p.identity_key,
-                         "property_type": p.property_type.value, "area_sqm": str(p.area_sqm)}
+                claim = QueueClaim(status=c.status, capacity=c.capacity.value, principal_name=c.principal_name,
+                                   authority_scope=c.authority_scope, property_id=p.id, identity_key=p.identity_key,
+                                   property_type=p.property_type.value, area_sqm=str(p.area_sqm))
         out.append(QueueItem(id=vr.id, kind=vr.kind, status=vr.status, user_id=vr.user_id, user_name=vr.user.full_name,
                              claim_id=vr.claim_id, listing_id=vr.listing_id, note=vr.note,
                              documents=[DocRef.model_validate(d) for d in docs], claim=claim, created_at=vr.created_at))
@@ -304,14 +315,22 @@ def moderate(listing_id: uuid.UUID, body: ModerateIn, request: Request, staff: U
 
 
 # --------------------------------------------------------------------------- disputes & duplicates
+class ClaimBrief(BaseModel):
+    claim_id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    status: ClaimStatus
+    capacity: str
+
+
 class DisputeOut(BaseModel):
     id: uuid.UUID
     property_id: uuid.UUID
     identity_key: str
     status: DisputeStatus
     reason: str
-    challenger: dict
-    existing: dict | None
+    challenger: ClaimBrief
+    existing: ClaimBrief | None
     resolution_note: str | None
     created_at: datetime
 
@@ -321,25 +340,25 @@ class ResolveIn(BaseModel):
     note: str = Field(min_length=3, max_length=2000)
 
 
-def _claim_brief(db: Session, claim_id: uuid.UUID | None) -> dict | None:
-    if not claim_id:
+def _claim_brief(db: Session, claim_id: uuid.UUID | None) -> ClaimBrief | None:
+    c = db.get(OwnershipClaim, claim_id) if claim_id else None
+    if c is None:
         return None
-    c = db.get(OwnershipClaim, claim_id)
-    u = db.get(User, c.claimant_id) if c else None
-    return {"claim_id": str(c.id), "user_id": str(c.claimant_id), "name": u.full_name if u else "", "status": c.status.value,
-            "capacity": c.capacity.value} if c else None
+    u = db.get(User, c.claimant_id)
+    return ClaimBrief(claim_id=c.id, user_id=c.claimant_id, name=u.full_name if u else "", status=c.status,
+                      capacity=c.capacity.value)
 
 
 @router.get("/disputes", response_model=list[DisputeOut])
-def disputes(status: DisputeStatus | None = DisputeStatus.open, _: User = Depends(require("dispute.resolve")), db: Session = Depends(get_db)):
+def disputes(status: DisputeStatus | Literal["all"] = DisputeStatus.open, _: User = Depends(require("dispute.resolve")), db: Session = Depends(get_db)):
     stmt = select(PropertyDispute)
-    if status:
+    if status != "all":
         stmt = stmt.where(PropertyDispute.status == status)
     out = []
     for d in db.scalars(stmt.order_by(PropertyDispute.created_at)).all():
         prop = db.get(Property, d.property_id)
         out.append(DisputeOut(id=d.id, property_id=d.property_id, identity_key=prop.identity_key if prop else "", status=d.status,
-                              reason=d.reason, challenger=_claim_brief(db, d.challenger_claim_id) or {},
+                              reason=d.reason, challenger=_claim_brief(db, d.challenger_claim_id),
                               existing=_claim_brief(db, d.existing_claim_id), resolution_note=d.resolution_note, created_at=d.created_at))
     return out
 
@@ -385,7 +404,9 @@ class AdminDealOut(BaseModel):
     kind: str
     status: DealStatus
     buyer_id: uuid.UUID
+    buyer_name: str
     owner_id: uuid.UUID
+    owner_name: str
     offers: int
     updated_at: datetime
 
@@ -396,13 +417,19 @@ def admin_deals(status: list[DealStatus] = Query(default=[]), _: User = Depends(
     if status:
         stmt = stmt.where(Deal.status.in_(status))
     deals = db.scalars(stmt.order_by(Deal.updated_at.desc()).limit(200)).all()
+    names = _names(db, {d.buyer_id for d in deals} | {d.owner_id for d in deals})
     return [AdminDealOut(id=d.id, listing_id=d.listing_id, listing_title=d.listing.title, kind=d.kind.value, status=d.status,
-                         buyer_id=d.buyer_id, owner_id=d.owner_id,
+                         buyer_id=d.buyer_id, buyer_name=names.get(d.buyer_id, ""), owner_id=d.owner_id,
+                         owner_name=names.get(d.owner_id, ""),
                          offers=db.scalar(select(func.count()).select_from(Offer).where(Offer.deal_id == d.id)) or 0,
                          updated_at=d.updated_at) for d in deals]
 
 
-@router.post("/maintenance/expire-offers")
+class ExpireOut(BaseModel):
+    expired: int
+
+
+@router.post("/maintenance/expire-offers", response_model=ExpireOut)
 def run_expiry(_: User = Depends(require("deal.monitor")), db: Session = Depends(get_db)):
     n = expire_all_offers(db)
     db.commit()
@@ -410,9 +437,17 @@ def run_expiry(_: User = Depends(require("deal.monitor")), db: Session = Depends
 
 
 # --------------------------------------------------------------------------- support
+def _names(db: Session, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not ids:
+        return {}
+    return dict(db.execute(select(User.id, User.full_name).where(User.id.in_(ids))).all())
+
+
 class AdminCaseOut(ORM):
     id: uuid.UUID
     reporter_id: uuid.UUID
+    reporter_name: str = ""
+    assignee_name: str | None = None
     category: str
     subject_type: str | None
     subject_id: str | None
@@ -432,7 +467,16 @@ class CaseUpdate(BaseModel):
 @router.get("/support", response_model=list[AdminCaseOut])
 def cases(status: list[SupportStatus] = Query(default=[SupportStatus.open, SupportStatus.in_progress]),
           _: User = Depends(require("support.handle")), db: Session = Depends(get_db)):
-    return db.scalars(select(SupportCase).where(SupportCase.status.in_(status)).order_by(SupportCase.created_at)).all()
+    rows = db.scalars(select(SupportCase).where(SupportCase.status.in_(status)).order_by(SupportCase.created_at)).all()
+    return [_case_out(db, c) for c in rows]
+
+
+def _case_out(db: Session, c: SupportCase) -> AdminCaseOut:
+    names = _names(db, {i for i in (c.reporter_id, c.assignee_id) if i})
+    out = AdminCaseOut.model_validate(c)
+    out.reporter_name = names.get(c.reporter_id, "")
+    out.assignee_name = names.get(c.assignee_id) if c.assignee_id else None
+    return out
 
 
 @router.patch("/support/{case_id}", response_model=AdminCaseOut)
@@ -451,7 +495,7 @@ def update_case(case_id: uuid.UUID, body: CaseUpdate, request: Request, staff: U
         notify(db, case.reporter_id, "support_case_updated", case_id=case.id)
     audit(db, "support.updated", "support_case", case.id, actor_id=staff.id, data={"status": case.status.value}, ip=client_ip(request))
     db.commit()
-    return case
+    return _case_out(db, case)
 
 
 # --------------------------------------------------------------------------- audit & analytics
@@ -480,7 +524,20 @@ def audit_logs(action: str | None = Query(default=None, max_length=80), entity_i
     return Page(items=[AuditOut.model_validate(r) for r in rows], total=total, page=page, page_size=page_size)
 
 
-@router.get("/analytics")
+class AnalyticsOut(BaseModel):
+    users_total: int
+    users_identity_verified: int
+    users_new_30d: int
+    properties_total: int
+    listings_by_status: dict[str, int]
+    deals_by_status: dict[str, int]
+    claims_by_status: dict[str, int]
+    verifications_pending: int
+    disputes_open: int
+    support_open: int
+
+
+@router.get("/analytics", response_model=AnalyticsOut)
 def analytics(_: User = Depends(require("analytics.read")), db: Session = Depends(get_db)):
     def counts(col):
         return {str(k.value if hasattr(k, "value") else k): v for k, v in db.execute(select(col, func.count()).group_by(col)).all()}
