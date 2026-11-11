@@ -571,8 +571,16 @@ class ServiceReferral(IdMixin, TimestampMixin, Base):
     message: Mapped[str] = mapped_column(String(1000), default="")
     # The user explicitly agreed to share these contact details with the provider.
     share_phone: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The verified number at the time of consent; a later phone change is not shared without a new opt-in.
+    shared_phone: Mapped[str | None] = mapped_column(String(20))
     status: Mapped[ReferralStatus] = mapped_column(E(ReferralStatus, "referral_status"), default=ReferralStatus.requested)
     provider: Mapped[ServiceProvider] = relationship()
+
+    __table_args__ = (
+        # At most one open request per user and provider, also under concurrent requests.
+        Index("uq_service_referrals_open", "user_id", "provider_id", unique=True,
+              postgresql_where=text("status IN ('requested', 'contacted')")),
+    )
 
 
 class IdempotencyRecord(Base):

@@ -10,5 +10,6 @@ from __future__ import annotations
 from pydantic_core import PydanticCustomError
 
 
-def rule_error(code: str, message: str) -> PydanticCustomError:
-    return PydanticCustomError(code, message)
+def rule_error(code: str, message: str, ctx: dict | None = None) -> PydanticCustomError:
+    """``message`` may reference ``ctx`` keys as ``{name}``; ctx is also sent to clients."""
+    return PydanticCustomError(code, message, ctx)

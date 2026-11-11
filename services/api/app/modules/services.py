@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, EmailStr, Field, HttpUrl
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, HttpUrl, field_validator
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core import rate_limit
@@ -21,6 +22,7 @@ from app.core.audit import audit
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user, request_lang, require
 from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.validation import rule_error
 from app.models.entities import Deal, ServiceProvider, ServiceReferral, User
 from app.models.enums import DealStatus as DS
 from app.models.enums import ReferralStatus, ServiceCategory
@@ -150,10 +152,14 @@ def request_referral(body: ReferralIn, request: Request, user: User = Depends(cu
     if open_one:
         raise Conflict("You already have an open request with this provider", code="referral_exists")
     r = ServiceReferral(provider_id=provider.id, user_id=user.id, deal_id=body.deal_id, message=body.message.strip(),
-                        share_phone=body.share_phone)
+                        share_phone=body.share_phone, shared_phone=user.phone if body.share_phone else None)
     r.provider = provider
     db.add(r)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:  # a concurrent request created the open referral first
+        db.rollback()
+        raise Conflict("You already have an open request with this provider", code="referral_exists") from exc
     audit(db, "service.referral_requested", "service_referral", r.id, actor_id=user.id,
           data={"provider_id": str(provider.id), "category": provider.category.value}, ip=client_ip(request))
     db.commit()
@@ -180,6 +186,18 @@ def cancel_referral(referral_id: uuid.UUID, user: User = Depends(current_user), 
 
 
 # --------------------------------------------------------------------------- admin
+WEBSITE_MAX = 200  # ServiceProvider.website column length
+
+
+def _website_fits(v: HttpUrl) -> HttpUrl:
+    if len(str(v)) > WEBSITE_MAX:
+        raise rule_error("url_too_long", "URL must be at most {max_length} characters", {"max_length": WEBSITE_MAX})
+    return v
+
+
+Website = Annotated[HttpUrl, AfterValidator(_website_fits)]
+
+
 class ProviderIn(BaseModel):
     category: ServiceCategory
     name_en: str = Field(min_length=2, max_length=120)
@@ -188,7 +206,7 @@ class ProviderIn(BaseModel):
     description_ar: str = Field(default="", max_length=2000)
     phone: str | None = Field(default=None, pattern=r"^\+?[0-9]{8,15}$")
     email: EmailStr | None = None
-    website: HttpUrl | None = None
+    website: Website | None = None
     license_number: str | None = Field(default=None, max_length=80)
     project_ids: list[uuid.UUID] = Field(default_factory=list)
     referral_fee_disclosure_en: str | None = Field(default=None, max_length=300)
@@ -204,13 +222,21 @@ class ProviderPatch(BaseModel):
     description_ar: str | None = Field(default=None, max_length=2000)
     phone: str | None = Field(default=None, pattern=r"^\+?[0-9]{8,15}$")
     email: EmailStr | None = None
-    website: HttpUrl | None = None
+    website: Website | None = None
     license_number: str | None = Field(default=None, max_length=80)
     project_ids: list[uuid.UUID] | None = None
     referral_fee_disclosure_en: str | None = Field(default=None, max_length=300)
     referral_fee_disclosure_ar: str | None = Field(default=None, max_length=300)
     is_active: bool | None = None
     verified: bool | None = None
+
+    # Omitting a field leaves it unchanged; an explicit null is only meaningful for optional fields.
+    @field_validator("category", "name_en", "name_ar", "description_en", "description_ar", "project_ids", "is_active", "verified")
+    @classmethod
+    def _not_null(cls, v):
+        if v is None:
+            raise rule_error("null_not_allowed", "This field cannot be null")
+        return v
 
 
 class AdminProviderOut(ProviderOut):
@@ -299,7 +325,7 @@ def admin_referrals(status: list[ReferralStatus] = Query(default=[]), _: User = 
     for r in db.scalars(stmt.order_by(ServiceReferral.created_at.desc()).limit(500)).all():
         u = db.get(User, r.user_id)
         out.append(AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, provider_name_ar=r.provider.name_ar, user_name=u.full_name if u else "",
-                                    user_phone=u.phone if (u and r.share_phone) else None, deal_id=r.deal_id, message=r.message,
+                                    user_phone=r.shared_phone if r.share_phone else None, deal_id=r.deal_id, message=r.message,
                                     status=r.status, created_at=r.created_at))
     return out
 
@@ -307,7 +333,8 @@ def admin_referrals(status: list[ReferralStatus] = Query(default=[]), _: User = 
 @admin_router.patch("/referrals/{referral_id}", response_model=AdminReferralOut)
 def update_referral(referral_id: uuid.UUID, body: ReferralStatusIn, request: Request, staff: User = Depends(require("services.manage")),
                     db: Session = Depends(get_db)):
-    r = db.scalar(select(ServiceReferral).options(joinedload(ServiceReferral.provider)).where(ServiceReferral.id == referral_id))
+    r = db.scalar(select(ServiceReferral).options(joinedload(ServiceReferral.provider)).where(ServiceReferral.id == referral_id)
+                  .with_for_update(of=ServiceReferral))
     if r is None:
         raise NotFound("Referral not found")
     if r.status not in OPEN_REFERRAL:
@@ -317,7 +344,7 @@ def update_referral(referral_id: uuid.UUID, body: ReferralStatusIn, request: Req
     db.commit()
     u = db.get(User, r.user_id)
     return AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, provider_name_ar=r.provider.name_ar, user_name=u.full_name if u else "",
-                            user_phone=u.phone if (u and r.share_phone) else None, deal_id=r.deal_id, message=r.message,
+                            user_phone=r.shared_phone if r.share_phone else None, deal_id=r.deal_id, message=r.message,
                             status=r.status, created_at=r.created_at)
 
 
