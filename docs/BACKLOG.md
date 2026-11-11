@@ -3,20 +3,20 @@
 Legend: P1 next, P2 soon, P3 later.
 
 ## Platform & quality
-- P1 Run GitHub Actions CI; build/run Docker image; staging deployment plan (no public deploy without approval).
-- P1 Scheduled worker: offer expiry, document retention purge (`documents.retain_until`), featured expiry.
+- ✅ CI green on GitHub. P1 build/run Docker image; staging deployment plan (no public deploy without approval).
+- ✅ Scheduled worker (done): `python -m app.worker`.
 - P2 Redis rate limiting; structured JSON logs with request ids; metrics/tracing.
 - P2 Server-computed `allowed_actions` on viewings and checklist items.
 - P2 Localized server validation messages (or field-level codes only).
 - P3 Load tests for search; Postgres full-text search (Arabic + English).
 
 ## Security
-- P1 Staff MFA (TOTP); account lockout policy.
+- ✅ Staff MFA backend (done); P1 admin enrollment + login screens; P2 account lockout policy.
 - P2 Malware scanning for uploads; S3-compatible private bucket with SSE + KMS; key rotation.
 - P2 Penetration test; dependency scanning in CI.
 
 ## Product
-- P1 Push notifications (Expo push adapter), notification preferences.
+- ✅ Push backend + preferences (done); P1 mobile registration + settings screen.
 - P1 Phone verification (SMS/OTP adapter).
 - P2 Mobile date pickers for all date fields; map view; saved searches & alerts.
 - P2 Owner analytics (views over time, inquiry funnel).
