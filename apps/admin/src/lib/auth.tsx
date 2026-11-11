@@ -11,8 +11,10 @@ interface AuthContextValue {
   status: Status;
   me: Me | null;
   api: AdminApi;
-  login: (email: string, password: string) => Promise<Me>;
+  login: (email: string, password: string, totpCode?: string) => Promise<Me>;
   logout: () => Promise<void>;
+  /** Re-reads /auth/me (e.g. after enabling two-factor authentication). */
+  refreshMe: () => Promise<void>;
   can: (permission: Permission) => boolean;
 }
 
@@ -47,8 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const m = await session.login(email, password);
+    async (email: string, password: string, totpCode?: string) => {
+      const m = await session.login(email, password, totpCode);
       setMe(m);
       setStatus("authenticated");
       return m;
@@ -62,25 +64,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, [session]);
 
+  const refreshMe = useCallback(async () => {
+    setMe(await session.me());
+  }, [session]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, me, api: makeAdminApi(session.call), login, logout, can: (p) => can(me?.role, p) }),
-    [status, me, session, login, logout],
+    () => ({ status, me, api: makeAdminApi(session.call), login, logout, refreshMe, can: (p) => can(me?.role, p) }),
+    [status, me, session, login, logout, refreshMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /** Test/storybook helper: provide a fixed user and API implementation. */
-export function MockAuthProvider({ me, api, children }: { me: Me; api: Partial<AdminApi>; children: ReactNode }) {
+export function MockAuthProvider({
+  me, api, children, status = "authenticated", login, refreshMe,
+}: {
+  me: Me | null;
+  api: Partial<AdminApi>;
+  children: ReactNode;
+  status?: Status;
+  login?: AuthContextValue["login"];
+  refreshMe?: AuthContextValue["refreshMe"];
+}) {
   const value = useMemo<AuthContextValue>(
     () => ({
-      status: "authenticated",
+      status,
       me,
       api: api as AdminApi,
-      login: async () => me,
+      login: login ?? (async () => me as Me),
       logout: async () => {},
-      can: (p) => can(me.role, p),
+      refreshMe: refreshMe ?? (async () => {}),
+      can: (p) => can(me?.role, p),
     }),
-    [me, api],
+    [me, api, status, login, refreshMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

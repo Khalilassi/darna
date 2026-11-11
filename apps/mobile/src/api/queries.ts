@@ -12,6 +12,7 @@ export const qk = {
   deals: ["deals"] as const,
   deal: (id: string) => ["deal", id] as const,
   notifications: ["notifications"] as const,
+  notificationPrefs: ["notifications", "preferences"] as const,
   myProperties: ["properties", "mine"] as const,
   myListings: ["listings", "mine"] as const,
   myListing: (id: string) => ["listings", "mine", id] as const,
@@ -113,4 +114,46 @@ export function useMyListing(id: string) {
 
 export function useVerifications() {
   return useQuery({ queryKey: qk.verifications, queryFn: async () => unwrap(await api.GET("/verifications")) });
+}
+
+export type PushPrefs = Record<string, boolean>;
+
+export function useNotificationPrefs() {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: qk.notificationPrefs,
+    enabled: status === "signedIn",
+    queryFn: async () => unwrap(await api.GET("/notifications/preferences")),
+  });
+}
+
+/**
+ * Toggles one push category. Optimistic: the switch flips at once; on failure only that category is
+ * rolled back (other in-flight toggles are kept) and the error is surfaced by the caller.
+ */
+export function useSetNotificationPref() {
+  const qc = useQueryClient();
+  const mutationKey = ["setNotificationPref"];
+  type Prefs = { push: PushPrefs };
+  return useMutation({
+    mutationKey,
+    mutationFn: async ({ category, enabled }: { category: string; enabled: boolean }) =>
+      unwrap(await api.PUT("/notifications/preferences", { body: { push: { [category]: enabled } } })),
+    onMutate: async ({ category, enabled }) => {
+      await qc.cancelQueries({ queryKey: qk.notificationPrefs });
+      const previous = qc.getQueryData<Prefs>(qk.notificationPrefs)?.push[category];
+      qc.setQueryData<Prefs>(qk.notificationPrefs, (old) => (old ? { push: { ...old.push, [category]: enabled } } : old));
+      return { previous };
+    },
+    onError: (_e, { category }, ctx) => {
+      if (ctx?.previous === undefined) return;
+      qc.setQueryData<Prefs>(qk.notificationPrefs, (old) => (old ? { push: { ...old.push, [category]: ctx.previous! } } : old));
+    },
+    onSuccess: (server, { category }) => {
+      qc.setQueryData<Prefs>(qk.notificationPrefs, (old) => (old ? { push: { ...old.push, [category]: server.push[category] ?? old.push[category] } } : server));
+    },
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey }) <= 1) void qc.invalidateQueries({ queryKey: qk.notificationPrefs });
+    },
+  });
 }

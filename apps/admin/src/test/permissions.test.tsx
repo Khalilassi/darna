@@ -7,15 +7,15 @@ const labels = (role: Parameters<typeof navForRole>[0]) => navForRole(role).map(
 
 describe("permission-based navigation", () => {
   it("reviewer sees verification and moderation only", () => {
-    expect(labels("reviewer")).toEqual(["Dashboard", "Verification queue", "Listings moderation"]);
+    expect(labels("reviewer")).toEqual(["Dashboard", "Verification queue", "Listings moderation", "Account security"]);
   });
 
   it("support sees deals monitor and support cases only", () => {
-    expect(labels("support")).toEqual(["Dashboard", "Deals monitor", "Support cases"]);
+    expect(labels("support")).toEqual(["Dashboard", "Deals monitor", "Support cases", "Account security"]);
   });
 
   it("admin sees everything", () => {
-    expect(labels("admin")).toHaveLength(9);
+    expect(labels("admin")).toHaveLength(10);
     expect(labels("admin")).toContain("Audit log");
   });
 
@@ -37,7 +37,7 @@ describe("permission-based navigation", () => {
     render(<NavList role="reviewer" pathname="/verifications" />);
     const list = screen.getByRole("list");
     const links = within(list).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["Dashboard", "Verification queue", "Listings moderation"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Dashboard", "Verification queue", "Listings moderation", "Account security"]);
     expect(screen.getByRole("link", { name: "Verification queue" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Audit log" })).not.toBeInTheDocument();

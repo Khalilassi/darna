@@ -22,23 +22,12 @@ export type CaseUpdate = Schemas["CaseUpdate"];
 export type AuditEntry = Schemas["AuditOut"];
 export type Page<T> = { items: T[]; total: number; page: number; page_size: number };
 
-/** GET /admin/analytics has no response model in the OpenAPI contract; this mirrors admin.py. */
-export interface Analytics {
-  users_total: number;
-  users_identity_verified: number;
-  users_new_30d: number;
-  properties_total: number;
-  listings_by_status: Record<string, number>;
-  deals_by_status: Record<string, number>;
-  claims_by_status: Record<string, number>;
-  verifications_pending: number;
-  disputes_open: number;
-  support_open: number;
-}
+export type Analytics = Schemas["AnalyticsOut"];
+export type MfaSetup = Schemas["MfaSetupOut"];
 
 export function makeAdminApi(call: Call) {
   return {
-    analytics: () => call((c) => c.GET("/admin/analytics")) as Promise<Analytics>,
+    analytics: () => call((c) => c.GET("/admin/analytics")),
 
     verifications: (query: { status?: VerificationStatus[]; kind?: VerificationKind }) =>
       call((c) => c.GET("/admin/verifications", { params: { query } })),
@@ -63,7 +52,11 @@ export function makeAdminApi(call: Call) {
       call((c) => c.PATCH("/admin/users/{user_id}", { params: { path: { user_id: id } }, body })),
 
     deals: (status?: DealStatus[]) => call((c) => c.GET("/admin/deals", { params: { query: { status } } })),
-    expireOffers: () => call((c) => c.POST("/admin/maintenance/expire-offers")) as Promise<{ expired: number }>,
+    expireOffers: () => call((c) => c.POST("/admin/maintenance/expire-offers")),
+
+    mfaSetup: () => call((c) => c.POST("/auth/mfa/setup")),
+    mfaConfirm: (code: string) => call((c) => c.POST("/auth/mfa/confirm", { body: { code } })),
+    mfaDisable: (code: string, password: string) => call((c) => c.POST("/auth/mfa/disable", { body: { code, password } })),
 
     support: (status?: SupportStatus[]) => call((c) => c.GET("/admin/support", { params: { query: { status } } })),
     updateCase: (id: string, body: CaseUpdate) =>

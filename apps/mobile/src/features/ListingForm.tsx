@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { Schemas } from "@darna/api-client";
-import { Button, Card, ChipGroup, Divider, IconButton, Notice, Row, Section, Select, T, TextField } from "../components";
+import { Button, Card, ChipGroup, DateField, Divider, IconButton, Notice, Row, Section, Select, T, TextField } from "../components";
 import { lineItemLabel } from "../components/PriceBreakdown";
 import { parseAmountInput } from "../i18n/format";
 import { DATE_RE, validateAmount, validateDate, validateInt } from "../lib/validation";
@@ -302,7 +302,7 @@ function InstallmentsEditor({ items, onChange, errors }: { items: InstallmentSta
           <TextField containerStyle={styles.flex} label={t("listingForm.everyMonths")} value={gen.every} onChangeText={(v) => setGen({ ...gen, every: v })} keyboardType="number-pad" />
         </Row>
         <Row gap={8}>
-          <TextField containerStyle={styles.flex} label={t("listingForm.firstDue")} placeholder="YYYY-MM-DD" value={gen.first} onChangeText={(v) => setGen({ ...gen, first: v })} />
+          <DateField containerStyle={styles.flex} label={t("listingForm.firstDue")} value={gen.first} onChange={(v) => setGen({ ...gen, first: v })} testID="lf-first-due" />
           <TextField containerStyle={styles.flex} label={t("listingForm.amount")} value={gen.amount} onChangeText={(v) => setGen({ ...gen, amount: v })} keyboardType="numeric" />
         </Row>
         {genError ? <T variant="caption" tone="danger">{genError}</T> : null}
@@ -312,7 +312,7 @@ function InstallmentsEditor({ items, onChange, errors }: { items: InstallmentSta
         <View key={i} style={{ gap: 6 }}>
           {i ? <Divider /> : null}
           <Row gap={8} style={{ alignItems: "flex-start" }}>
-            <TextField containerStyle={styles.flex} label={t("listingForm.dueDate")} placeholder="YYYY-MM-DD" value={it.due_date} onChangeText={(v) => update(i, { due_date: v })} error={errors[`sale_terms.installments.${i}.due_date`]} />
+            <DateField containerStyle={styles.flex} label={t("listingForm.dueDate")} value={it.due_date} onChange={(v) => update(i, { due_date: v })} error={errors[`sale_terms.installments.${i}.due_date`]} testID={`lf-due-${i}`} />
             <TextField containerStyle={styles.flex} label={t("listingForm.amount")} value={it.amount} onChangeText={(v) => update(i, { amount: v })} keyboardType="numeric" error={errors[`sale_terms.installments.${i}.amount`]} />
             <View style={{ paddingTop: 22 }}>
               <IconButton icon="trash-outline" label={t("common.remove")} onPress={() => onChange(items.filter((_, j) => j !== i))} />
@@ -425,7 +425,7 @@ export function ListingForm({
             <TextField containerStyle={styles.flex} label={t("listingForm.minLease")} value={s.rent.min_lease_months} onChangeText={(v) => setRent({ min_lease_months: v })} keyboardType="number-pad" error={errors["rent_terms.min_lease_months"]} />
             <TextField containerStyle={styles.flex} label={t("listingForm.increase")} value={s.rent.annual_increase_pct} onChangeText={(v) => setRent({ annual_increase_pct: v })} keyboardType="decimal-pad" error={errors["rent_terms.annual_increase_pct"]} optional optionalLabel={t("common.optional")} />
           </Row>
-          <TextField label={t("listingForm.availableFrom")} placeholder="YYYY-MM-DD" value={s.rent.available_from} onChangeText={(v) => setRent({ available_from: v })} error={errors["rent_terms.available_from"]} optional optionalLabel={t("common.optional")} />
+          <DateField label={t("listingForm.availableFrom")} value={s.rent.available_from} onChange={(v) => setRent({ available_from: v })} error={errors["rent_terms.available_from"]} optional testID="lf-available-from" />
           <ChipGroup label={t("listingForm.furnished")} value={s.rent.furnished} onChange={(v) => v !== undefined && setRent({ furnished: v })} options={yesNo} />
           <ChipGroup label={t("listingForm.utilities")} value={s.rent.utilities_included} onChange={(v) => v !== undefined && setRent({ utilities_included: v })} options={yesNo} />
           <FeesEditor fees={s.rent.fees} onChange={(f) => setRent({ fees: f })} errors={errors} path="rent_terms.fees" allowSplit />

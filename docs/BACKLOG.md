@@ -11,14 +11,14 @@ Legend: P1 next, P2 soon, P3 later.
 - P3 Load tests for search; Postgres full-text search (Arabic + English).
 
 ## Security
-- ✅ Staff MFA backend (done); P1 admin enrollment + login screens; P2 account lockout policy.
+- ✅ Staff MFA (backend + admin screens). P2 account lockout policy.
 - P2 Malware scanning for uploads; S3-compatible private bucket with SSE + KMS; key rotation.
 - P2 Penetration test; dependency scanning in CI.
 
 ## Product
-- ✅ Push backend + preferences (done); P1 mobile registration + settings screen.
+- ✅ Push (backend, mobile registration, deep links, settings). P1 verify on a device with an EAS project.
 - P1 Phone verification (SMS/OTP adapter).
-- P2 Mobile date pickers for all date fields; map view; saved searches & alerts.
+- ✅ Mobile date pickers. P2 map view; saved searches & alerts.
 - P2 Owner analytics (views over time, inquiry funnel).
 - P2 Price history, price-per-m² analytics by district; cash-vs-installment comparison.
 - P3 Additional communities (Al Rehab, Noor, Celia are seeded inactive — activate with district data).

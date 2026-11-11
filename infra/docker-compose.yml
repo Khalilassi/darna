@@ -29,6 +29,14 @@ services:
     volumes: [storage:/app/storage]
     depends_on:
       migrate: { condition: service_completed_successfully }
+  worker:
+    build: ../services/api
+    # Offer expiry, document retention purge, featured expiry, token cleanup every 5 minutes.
+    command: ["python", "-m", "app.worker", "--interval", "300"]
+    environment: *apienv
+    volumes: [storage:/app/storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
 volumes:
   pgdata:
   storage:

@@ -32,7 +32,8 @@ export function can(role: Role | null | undefined, permission: Permission): bool
 export interface NavItem {
   href: string;
   label: string;
-  permission: Permission;
+  /** null = available to every staff role. */
+  permission: Permission | null;
 }
 
 export const NAV: readonly NavItem[] = [
@@ -45,8 +46,9 @@ export const NAV: readonly NavItem[] = [
   { href: "/deals", label: "Deals monitor", permission: "deal.monitor" },
   { href: "/support", label: "Support cases", permission: "support.handle" },
   { href: "/audit", label: "Audit log", permission: "audit.read" },
+  { href: "/security", label: "Account security", permission: null },
 ];
 
 export function navForRole(role: Role | null | undefined): NavItem[] {
-  return NAV.filter((item) => can(role, item.permission));
+  return NAV.filter((item) => (item.permission === null ? isStaff(role) : can(role, item.permission)));
 }

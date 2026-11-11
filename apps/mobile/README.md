@@ -34,12 +34,49 @@ npm run ios            # iOS simulator (macOS + Xcode)
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_URL` | `http://localhost:8000` | On the Android emulator the default becomes `http://10.0.2.2:8000`. On a physical device use your machine's LAN IP, e.g. `http://192.168.1.20:8000`. |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | unset | EAS project id used for Expo push tokens (also exposed as `extra.eas.projectId`). Unset → push registration is skipped and settings shows "Push not configured in this build". |
 
 The API returns absolute media URLs (`http://localhost:8000/media/...`); `src/config.ts#mediaUrl`
 rewrites that origin to `EXPO_PUBLIC_API_URL` so images load on emulators/devices.
 
 Demo accounts (password `Demo-pass-2026`): `buyer@example.com`, `tenant@example.com`,
 `owner@example.com`, `newowner@example.com`.
+
+## Push notifications
+
+`src/notifications/` — `push.ts` (pure, tested: token format check, data → route mapping, status model),
+`device.ts` (permission, Expo push token, `POST/DELETE /notifications/devices`) and `PushProvider`
+(registration after sign-in, deep links on tap).
+
+* After sign-in on a **physical** iOS/Android device the app asks for permission **once** (never re-prompts
+  after a denial; settings offers "Open phone settings" instead), gets the Expo push token and registers
+  it. Web, simulators and emulators register nothing; settings shows why.
+* Sign-out unregisters the token (`DELETE /notifications/devices?token=…`) **before** auth is cleared.
+* Taps deep-link by `data`: `conversation_id` → chat, `deal_id` → deal workspace, `viewing_id` → viewings,
+  `listing_id` → owner listing (for `listing_*` events) or the public listing, `property_id`/verification →
+  owner hub, `case_id` → support. Only id-shaped values are accepted.
+* **Notification settings** (Profile → Notification settings, or Settings) toggle the API's per-category
+  push preferences (`GET/PUT /notifications/preferences`) optimistically, rolling back a failed toggle.
+
+Real delivery is **not verified here** and needs:
+
+1. An EAS project: `npx eas-cli init`, then set `EXPO_PUBLIC_EAS_PROJECT_ID` (or `extra.eas.projectId`).
+2. Credentials: Android — an FCM v1 service-account key uploaded with `npx eas-cli credentials`
+   (plus `google-services.json` / `android.googleServicesFile` in the app config); iOS — an APNs key
+   (Apple Developer account), managed by EAS credentials.
+3. A development or production build (`eas build`) on a physical device. Expo Go is not suitable for
+   push on Android since SDK 53.
+4. The API with `DARNA_PUSH_PROVIDER=expo` (default `log` only logs) and optionally
+   `DARNA_EXPO_ACCESS_TOKEN` if "enhanced push security" is enabled on the Expo account.
+
+## Dates
+
+All date inputs use `DateField` (`src/components/DateField.tsx` native, `DateField.web.tsx` web). Values
+stay ISO `YYYY-MM-DD` strings. Native uses `@react-native-community/datetimepicker` (Android dialog, iOS
+inline calendar in a sheet); web overlays a transparent `<input type="date">` on the localized display,
+so Playwright can `fill('YYYY-MM-DD')` on the `testID`. Supports `min`/`max` (handover, lease start and
+authority expiry cannot be in the past), localized display (Arabic-Indic digits), RTL, a clear button for
+optional fields and range messages. Pure helpers live in `src/lib/date.ts`.
 
 ## Quality checks
 
@@ -53,7 +90,9 @@ npx expo export --platform android     # Hermes bundle (JS only, not an APK)
 Tests (`src/__tests__`): `ListingCard`, `PriceBreakdown` (provenance per line, "Not yet confirmed"
 items, estimate assumptions, warnings, rent), i18n/RTL helpers (Arabic-Indic digits, Arabic plurals,
 direction + native `forceRTL`, key parity en/ar) and the token refresh logic (refresh once + retry,
-single-flight refresh for concurrent 401s, sign-out on refused refresh, no refresh for `/auth/*`).
+single-flight refresh for concurrent 401s, sign-out on refused refresh, no refresh for `/auth/*`),
+push helpers (token format, project id, data → route incl. hostile data) and DateField (ISO parsing/formatting,
+Arabic digits, min/max, validation messages, clear button).
 
 ## Structure
 
@@ -66,11 +105,12 @@ app/                      routes (Expo Router)
   viewing/, viewings      request a viewing (2 h–60 days, sent as UTC ISO), viewing actions
   offer/, deal/[id]       offers (Idempotency-Key), deal workspace
   owner/                  hub, identity verification, register/claim property, listing create/edit/manage
-  notifications, settings, support, welcome, login, register
+  notifications, settings, notification-settings, support, welcome, login, register
 src/api                   client wiring (auth + refresh middleware), query hooks, error localization
 src/auth                  session/refresh logic (pure, tested) and AuthProvider
 src/components            Button, TextField, Chips/Select/Segmented, Card, Badge, Notice, ListingCard,
-                          PriceBreakdown, Stepper, DateTimeSlots, DocumentUploader, Empty/Error/Loading states, Screen
+                          PriceBreakdown, Stepper, DateTimeSlots, DateField, DocumentUploader, Empty/Error/Loading states, Screen
+src/notifications         push registration (device.ts), PushProvider (deep links), pure helpers (push.ts)
 src/features              OfferForm, ListingForm (sale/rent terms, installments, fees), ClaimForm, ViewingsList
 src/i18n                  en/ar resources, formatting, direction helpers, LanguageProvider
 ```

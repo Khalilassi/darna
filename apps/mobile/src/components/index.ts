@@ -15,3 +15,4 @@ export * from "./DateTimeSlots";
 export * from "./DocumentUploader";
 export * from "./SignInRequired";
 export * from "./CompareBar";
+export * from "./DateField";

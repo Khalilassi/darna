@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Platform } from "react-native";
+import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, unwrap } from "../src/api/client";
@@ -16,6 +17,7 @@ export default function Settings() {
   const { lang, setLanguage } = useLanguage();
   const { pref, setPref } = useTheme();
   const { status } = useAuth();
+  const router = useRouter();
 
   const changeLanguage = async (l: Language) => {
     if (l === lang) return;
@@ -42,6 +44,10 @@ export default function Settings() {
           onChange={setPref}
           options={[{ value: "system", label: t("settings.system") }, { value: "light", label: t("settings.light") }, { value: "dark", label: t("settings.dark") }]}
         />
+      </Card>
+      <Card>
+        <T variant="heading">{t("notifPrefs.title")}</T>
+        <Button title={t("notifPrefs.link")} icon="notifications-outline" variant="outline" onPress={() => router.push("/notification-settings")} testID="settings-notifications" />
       </Card>
       {status === "signedIn" ? <ProfileForm /> : <SignInRequired>{null}</SignInRequired>}
     </Screen>

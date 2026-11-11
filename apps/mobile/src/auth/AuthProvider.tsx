@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, session, toTokens, unwrap, type Schemas } from "../api/client";
+import { unregisterPushDevice } from "../notifications/device";
 
 type Status = "loading" | "signedOut" | "signedIn";
 
@@ -70,6 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Unregister this device's push token while the access token is still valid.
+    await unregisterPushDevice().catch(() => undefined);
     const rt = session.getRefreshToken();
     if (rt) await api.POST("/auth/logout", { body: { refresh_token: rt } }).catch(() => undefined);
     await session.clear("signout");

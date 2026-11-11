@@ -6,6 +6,8 @@ import type { ExpoConfig } from "expo/config";
  * Env:
  *   EXPO_PUBLIC_API_URL  API base URL. Default http://localhost:8000 (on the Android emulator the
  *                        runtime default becomes http://10.0.2.2:8000, see src/config.ts).
+ *   EXPO_PUBLIC_EAS_PROJECT_ID  EAS project id, needed for Expo push tokens. Without it the app skips
+ *                        push registration and settings shows "Push not configured in this build".
  */
 const config: ExpoConfig = {
   name: "Darna",
@@ -29,6 +31,8 @@ const config: ExpoConfig = {
     "expo-secure-store",
     // Arabic is a first-class language: the native layout may flip to RTL.
     ["expo-localization", { supportsRTL: true }],
+    ["expo-notifications", { color: "#2E4A3C" }],
+    "@react-native-community/datetimepicker",
     [
       "expo-image-picker",
       {
@@ -40,6 +44,7 @@ const config: ExpoConfig = {
   extra: {
     supportsRTL: true,
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000",
+    ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? { eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID } } : {}),
   },
 };
 

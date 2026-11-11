@@ -153,3 +153,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .login-card { width: min(380px, 100%); padding: var(--space-xxl); }
 .login-card .brand { padding: 0; margin-bottom: var(--space-md); }
 .login-card h1 { margin-bottom: 4px; }
+
+/* Account security */
+.mfa-banner { margin-bottom: var(--space-lg); }
+.qr-wrap { margin-top: 8px; padding: 8px; background: #fff; border-radius: 8px; display: block; width: fit-content; }
+.qr { display: block; image-rendering: pixelated; }
+.secret { display: inline-block; margin-top: 6px; padding: 6px 10px; border-radius: 6px; background: var(--c-surface-muted); letter-spacing: 0.08em; user-select: all; }

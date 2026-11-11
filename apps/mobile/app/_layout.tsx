@@ -12,6 +12,7 @@ import { initI18n } from "../src/i18n";
 import { applyDirection } from "../src/i18n/direction";
 import { detectInitialLanguage, LanguageProvider } from "../src/i18n/LanguageProvider";
 import type { Language } from "../src/i18n/language";
+import { PushProvider } from "../src/notifications/PushProvider";
 import { CompareProvider } from "../src/state/compare";
 import { FiltersProvider } from "../src/state/filters";
 import { ThemeProvider, useTheme } from "../src/theme";
@@ -67,7 +68,7 @@ function Navigation() {
   }, [expired, router]);
 
   return (
-    <>
+    <PushProvider>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <Stack
         screenOptions={{
@@ -103,7 +104,8 @@ function Navigation() {
         <Stack.Screen name="owner/listing-new" options={{ title: t("listingForm.titleNew") }} />
         <Stack.Screen name="owner/listing/[id]" options={{ title: t("manage.title") }} />
         <Stack.Screen name="owner/listing-edit/[id]" options={{ title: t("listingForm.titleEdit") }} />
+        <Stack.Screen name="notification-settings" options={{ title: t("notifPrefs.title") }} />
       </Stack>
-    </>
+    </PushProvider>
   );
 }

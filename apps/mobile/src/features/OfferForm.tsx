@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { Schemas } from "@darna/api-client";
-import { Button, ChipGroup, Notice, T, TextField } from "../components";
+import { Button, ChipGroup, DateField, Notice, T, TextField } from "../components";
 import { formatMoney, parseAmountInput } from "../i18n/format";
 import { useLanguage } from "../i18n/LanguageProvider";
+import { todayISO } from "../lib/date";
 import { hasErrors, validateAmount, validateDate, validateInt } from "../lib/validation";
 
 export interface OfferPayload {
@@ -70,13 +71,13 @@ export function OfferForm({
       />
       {kind === "sale" ? (
         <>
-          <TextField label={t("offer.handoverDate")} value={handover} onChangeText={setHandover} placeholder={t("offer.datePlaceholder")} optional optionalLabel={t("common.optional")} error={errors.handover ?? fieldErrors["terms.proposed_handover_date"]} />
+          <DateField label={t("offer.handoverDate")} value={handover} onChange={setHandover} min={todayISO()} optional error={errors.handover ?? fieldErrors["terms.proposed_handover_date"]} testID="offer-handover" />
           <TextField label={t("offer.paymentNote")} value={paymentNote} onChangeText={setPaymentNote} placeholder={t("offer.paymentNotePlaceholder")} maxLength={300} optional optionalLabel={t("common.optional")} />
         </>
       ) : (
         <>
           <TextField label={t("offer.leaseMonths")} value={leaseMonths} onChangeText={setLeaseMonths} keyboardType="number-pad" error={errors.lease_months ?? fieldErrors["terms.lease_months"]} testID="offer-lease-months" />
-          <TextField label={t("offer.startDate")} value={startDate} onChangeText={setStartDate} placeholder={t("offer.datePlaceholder")} optional optionalLabel={t("common.optional")} error={errors.start_date ?? fieldErrors["terms.start_date"]} />
+          <DateField label={t("offer.startDate")} value={startDate} onChange={setStartDate} min={todayISO()} optional error={errors.start_date ?? fieldErrors["terms.start_date"]} testID="offer-start-date" />
           <ChipGroup label={t("offer.furnished")} value={furnished} allowClear onChange={setFurnished} options={[{ value: true, label: t("common.yes") }, { value: false, label: t("common.no") }]} />
         </>
       )}

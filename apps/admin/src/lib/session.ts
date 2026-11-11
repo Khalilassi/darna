@@ -106,8 +106,9 @@ export class Session {
   }
 
   /** Signs in and rejects non-staff roles (their tokens are revoked immediately). */
-  async login(email: string, password: string): Promise<Me> {
-    const tokens = unwrap(await this.client.POST("/auth/login", { body: { email, password } }));
+  async login(email: string, password: string, totpCode?: string): Promise<Me> {
+    const body = totpCode ? { email, password, totp_code: totpCode } : { email, password };
+    const tokens = unwrap(await this.client.POST("/auth/login", { body }));
     this.tokens = { access_token: tokens.access_token, refresh_token: tokens.refresh_token };
     let me: Me;
     try {

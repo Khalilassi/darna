@@ -74,6 +74,15 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main id="main" className="main" tabIndex={-1}>
+        {!me.mfa_enabled_at && pathname !== "/security" && (
+          <div className="alert alert-warning mfa-banner" role="status">
+            Two-factor authentication is off for your account.{" "}
+            <Link href="/security" className="link">
+              Set it up now
+            </Link>
+            .
+          </div>
+        )}
         {children}
       </main>
     </div>

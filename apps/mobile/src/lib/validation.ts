@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
 import { parseAmountInput } from "../i18n/format";
+import { currentLanguage } from "../i18n/language";
+import { displayDate, isValidISODate, rangeViolation, todayISO } from "./date";
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -27,10 +29,22 @@ export function validateAmount(v: string, t: TFunction, { required = true } = {}
 }
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-export function validateDate(v: string, t: TFunction, { required = false, future = false } = {}): string | undefined {
-  if (!v.trim()) return required ? t("validation.required") : undefined;
-  if (!DATE_RE.test(v.trim()) || Number.isNaN(new Date(`${v.trim()}T00:00:00`).getTime())) return t("validation.date");
-  if (future && new Date(`${v.trim()}T23:59:59`) < new Date()) return t("validation.futureDate");
+/**
+ * Validates an ISO `YYYY-MM-DD` value. `future` means today or later (local calendar);
+ * `min`/`max` are inclusive ISO bounds.
+ */
+export function validateDate(
+  v: string,
+  t: TFunction,
+  { required = false, future = false, min, max }: { required?: boolean; future?: boolean; min?: string; max?: string } = {},
+): string | undefined {
+  const s = v.trim();
+  if (!s) return required ? t("validation.required") : undefined;
+  if (!isValidISODate(s)) return t("validation.date");
+  if (future && s < todayISO()) return t("validation.futureDate");
+  const r = rangeViolation(s, { min, max });
+  if (r === "min") return t("validation.minDate", { date: displayDate(min, currentLanguage()) });
+  if (r === "max") return t("validation.maxDate", { date: displayDate(max, currentLanguage()) });
   return undefined;
 }
 

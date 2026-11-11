@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { Schemas } from "@darna/api-client";
-import { Button, ChipGroup, DocumentUploader, MultiChipGroup, Notice, T, TextField } from "../components";
+import { Button, ChipGroup, DateField, DocumentUploader, MultiChipGroup, Notice, T, TextField } from "../components";
+import { todayISO } from "../lib/date";
 import { validateDate } from "../lib/validation";
 
 const CLAIM_DOC_KINDS: Schemas["DocumentKind"][] = ["ownership_contract", "developer_statement", "power_of_attorney", "payment_receipt", "other"];
@@ -60,7 +61,7 @@ export function ClaimForm({
             options={(["list", "negotiate", "sign"] as const).map((s) => ({ value: s, label: t(`enum.scope.${s}`) }))}
             error={errors.scope}
           />
-          <TextField label={t("claim.expiry")} placeholder="YYYY-MM-DD" value={expiry} onChangeText={setExpiry} optional optionalLabel={t("common.optional")} error={errors.expiry} />
+          <DateField label={t("claim.expiry")} value={expiry} onChange={setExpiry} min={todayISO()} optional error={errors.expiry} testID="claim-expiry" />
         </>
       ) : null}
       <T variant="caption" tone="muted">{t("claim.docsHelp")}</T>
