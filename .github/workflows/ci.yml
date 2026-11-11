@@ -21,7 +21,7 @@ jobs:
     env:
       DARNA_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/darna_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with: { python-version: "3.13", cache: pip, cache-dependency-path: services/api/requirements*.txt }
       - run: pip install -r requirements.txt -r requirements-dev.txt
@@ -35,7 +35,7 @@ jobs:
   js:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm }
       - run: npm ci
@@ -50,7 +50,7 @@ jobs:
     # Known-vulnerability scan of runtime dependencies. Fails on high/critical; lower severities are printed.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with: { python-version: "3.13", cache: pip, cache-dependency-path: services/api/requirements*.txt }
       - uses: actions/setup-node@v4
@@ -85,7 +85,7 @@ jobs:
       DARNA_PUBLIC_BASE_URL: http://localhost:8000
       E2E_SCREENSHOT_DIR: ${{ github.workspace }}/e2e-screenshots
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with: { python-version: "3.13", cache: pip, cache-dependency-path: services/api/requirements*.txt }
       - uses: actions/setup-node@v4
