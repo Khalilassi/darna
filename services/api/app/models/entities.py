@@ -17,6 +17,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    Computed,
     Date,
     DateTime,
     Enum,
@@ -29,7 +30,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, TimestampMixin, utcnow
@@ -268,10 +269,7 @@ class Listing(IdMixin, TimestampMixin, Base):
             postgresql_where=text(f"status IN ({_in_list(LISTING_OCCUPYING_STATUSES)})"),
         ),
         Index("ix_listings_status_published", "status", "published_at"),
-        # Trigram indexes make ILIKE '%term%' text search fast for selective terms (pg_trgm extension).
-        Index("ix_listings_title_trgm", "title", postgresql_using="gin", postgresql_ops={"title": "gin_trgm_ops"}),
-        Index("ix_listings_description_trgm", "description", postgresql_using="gin",
-              postgresql_ops={"description": "gin_trgm_ops"}),
+        # GIN indexes on search_text (pg_trgm) and search_tsv are created in migration 751cc70de6dd.
     )
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -280,6 +278,12 @@ class Listing(IdMixin, TimestampMixin, Base):
     status: Mapped[ListingStatus] = mapped_column(E(ListingStatus, "listing_status"), default=ListingStatus.draft)
     title: Mapped[str] = mapped_column(String(140))
     description: Mapped[str] = mapped_column(Text, default="")
+    # Maintained by Postgres (generated columns, migration 751cc70de6dd); never written by the app.
+    search_text: Mapped[str | None] = mapped_column(
+        Text, Computed("darna_search_norm(coalesce(title, '') || ' ' || coalesce(description, ''))", persisted=True),
+        deferred=True)
+    search_tsv: Mapped[str | None] = mapped_column(
+        TSVECTOR, Computed("darna_listing_tsv(title, description)", persisted=True), deferred=True)
     # Sale financial input (see app.finance.engine.SaleInput); validated JSON with Decimal strings.
     sale_terms: Mapped[dict | None] = mapped_column(Json)
     # Rent input (see app.finance.engine.RentInput).

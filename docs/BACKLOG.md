@@ -8,7 +8,7 @@ Legend: P1 next, P2 soon, P3 later.
 - ✅ Redis rate limiting; request ids, JSON logs, Prometheus metrics. P3 distributed tracing.
 - ✅ Server-computed `allowed_actions` on viewings and checklist items (one rule function per resource, used by both the endpoint and the response).
 - ✅ Coded validation errors (`type` per rule + `ctx` limits), localized in the mobile app. P3 same localization in admin/web forms.
-- ✅ Search benchmark + trigram indexes. P3 Postgres full-text search (Arabic + English).
+- ✅ Search benchmark + trigram indexes; Arabic-normalized substring + English/Arabic stemmed full-text search.
 
 ## Security
 - ✅ Staff MFA (backend + admin screens); account lockout.

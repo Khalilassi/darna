@@ -31,5 +31,27 @@ What changed:
    separate `COUNT(*)` that scanned every match a second time, then loads the 20 cards by id.
 
 Realistic scale for one community is a few thousand active listings, where every query above is well under
-the 20,000-listing figures. Next steps if search grows: full-text search with Arabic/English configurations,
-and caching the anonymous default browse page.
+the 20,000-listing figures.
+
+## Arabic/English-aware text search (migration `751cc70de6dd`)
+
+Search text is normalized by `darna_search_norm()`: diacritics and tatweel are removed, alef forms
+(أ إ آ ٱ), ى/ي, ة/ه, ؤ/و and ئ/ي are unified, Arabic-Indic digits become ASCII, and Latin text is lowercased.
+A listing matches when the normalized query is a substring of the normalized title and description, **or**
+when the stemmed query matches in English or Arabic (`apartment` ~ `apartments`, `مفروشة` ~ `مفروشه`).
+
+The first version computed the normalization inside the query (expression indexes). For common terms the
+planner correctly scans, so every matching row was re-normalized: "garden" took 278 ms and "corner view"
+1,456 ms. The shipped version stores both values in generated columns (`search_text`, `search_tsv`) with GIN
+indexes, so a scan compares stored values:
+
+| Query (20,000 listings) | Previous ILIKE | Expressions in query | **Stored columns (current)** |
+|---|---|---|---|
+| Text "garden" | 45 (57) | 278 (296) | **48 (52)** |
+| Text "corner view" | 45 (56) | 1,457 (1,539) | **124 (143)** |
+| Text "skylight" (rare) | 5 (7) | 9 (9) | **8 (10)** |
+
+"corner view" is slower than the old exact-phrase `ILIKE` because it now also matches listings that contain
+both words anywhere, which is most of the synthetic data set (13,420 matches to count). That is the intended
+behaviour. Generated columns are rewritten if `darna_search_norm` or `darna_listing_tsv` ever changes, which
+requires a migration that recreates them. Next step if search grows: cache the anonymous default browse page.

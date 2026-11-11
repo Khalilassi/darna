@@ -249,9 +249,38 @@ def test_search_total_and_pages_with_single_pass(make_user, project, reviewer, c
     assert client.get("/listings", params={"q": "nomatchxyz"}).json() == {"items": [], "total": 0, "page": 1, "page_size": 20}
 
 
-def test_migrations_create_trigram_search_indexes(db):
-    """alembic check skips *_trgm indexes (opclass reflection), so assert the migration really creates them."""
+def test_migrations_create_text_search_indexes(db):
+    """alembic check skips *_trgm / *_fts indexes (expression/opclass), so assert the migration creates them."""
     from sqlalchemy import text as _t
-    names = set(db.execute(_t("select indexname from pg_indexes where tablename = 'listings' and indexname like '%trgm%'")).scalars())
-    assert names == {"ix_listings_title_trgm", "ix_listings_description_trgm"}
+    names = set(db.execute(_t("select indexname from pg_indexes where tablename = 'listings' "
+                              "and (indexname like '%trgm' or indexname like '%fts')")).scalars())
+    assert names == {"ix_listings_search_text_trgm", "ix_listings_search_fts"}
     assert db.execute(_t("select count(*) from pg_extension where extname = 'pg_trgm'")).scalar() == 1
+
+
+def test_search_ignores_arabic_spelling_variants_and_word_forms(make_user, project, reviewer, client, db):
+    from app.models.entities import Listing
+    owner = make_user(verified=True)
+    texts = {
+        publish_listing(owner, reviewer, project, unit="1"): ("شقة مفروشة للإيجار بالقرب من الحديقة", "إطلالة على المسطحات الخضراء"),
+        publish_listing(owner, reviewer, project, unit="2"): ("Corner villa with private gardens", "Close to the club"),
+        publish_listing(owner, reviewer, project, unit="3"): ("Bright studio", "Synthetic demo listing"),
+    }
+    for lid, (title, desc) in texts.items():
+        row = db.get(Listing, lid)
+        row.title, row.description = title, desc
+    db.commit()
+    ar, en, _other = texts
+
+    def hits(q):
+        return {x["id"] for x in client.get("/listings", params={"q": q}).json()["items"]}
+
+    assert hits("شقه مفروشه") == {ar}          # ة written as ه (common in Egypt)
+    assert hits("اطلاله") == {ar}              # إ/ة variants in the description
+    assert hits("شَقَّة") == {ar}               # diacritics are ignored
+    assert hits("مفروش") == {ar}               # substring / stem
+    assert hits("garden") == {en}              # English stemming: garden ~ gardens
+    assert hits("gardening") == {en}           # only a stemmed match (garden), not a substring
+    assert hits("VILLA") == {en}               # case-insensitive
+    assert hits("100%_") == set()              # LIKE wildcards are not interpreted
+

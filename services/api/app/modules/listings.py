@@ -8,7 +8,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, Field, ValidationError, model_validator
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, literal_column, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -594,9 +594,21 @@ def search_conditions(f: SearchFilters):
     if f.furnished is not None:
         conds.append(Listing.furnished.is_(f.furnished))
     if f.q:
-        like = f"%{f.q.replace('%', '').replace('_', '')}%"
-        conds.append(or_(Listing.title.ilike(like), Listing.description.ilike(like)))
+        conds.append(text_condition(f.q))
     return conds, price_col
+
+
+def text_condition(q: str):
+    """Arabic- and English-aware text match on precomputed columns (migration 751cc70de6dd).
+
+    Substring match on normalized text (spelling variants such as أ/ا, ة/ه, ى/ي and diacritics
+    are ignored) OR a stemmed full-text match in either language (apartment/apartments).
+    """
+    term = q.replace("%", "").replace("_", "").strip()
+    norm_q = func.darna_search_norm(term)
+    tsq = func.websearch_to_tsquery(literal_column("'english'::regconfig"), norm_q).op("||")(
+        func.websearch_to_tsquery(literal_column("'arabic'::regconfig"), norm_q))
+    return or_(Listing.search_text.like(func.concat("%", norm_q, "%")), Listing.search_tsv.op("@@")(tsq))
 
 
 def run_search(db: Session, f: SearchFilters, sort: SortKey = "newest", page: int = 1, page_size: int = 20) -> Page[ListingCard]:
