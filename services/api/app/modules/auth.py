@@ -24,6 +24,7 @@ from app.core.security import (
     sha256_hex,
     verify_password,
 )
+from app.core.validation import rule_error
 from app.models.entities import LoginThrottle, OwnershipClaim, RefreshToken, User, VerificationRequest
 from app.models.enums import ClaimStatus, Role, VerificationKind, VerificationStatus
 from app.schemas.common import ORM, Ok
@@ -43,7 +44,7 @@ class RegisterIn(BaseModel):
     @classmethod
     def strong(cls, v: str) -> str:
         if v.isalpha() or v.isdigit():
-            raise ValueError("password must mix letters and numbers or symbols")
+            raise rule_error("password_too_simple", "password must mix letters and numbers or symbols")
         return v
 
 

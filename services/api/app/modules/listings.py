@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +22,7 @@ from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.scanning import ensure_clean
 from app.core.state_machine import StateMachine
 from app.core.storage import public_storage
+from app.core.validation import rule_error
 from app.finance.engine import (
     Amount,
     Fee,
@@ -113,7 +114,7 @@ class ListingIn(BaseModel):
         needs_sale = self.purpose in (ListingPurpose.sale, ListingPurpose.sale_and_rent)
         needs_rent = self.purpose in (ListingPurpose.rent, ListingPurpose.sale_and_rent)
         if needs_sale != (self.sale_terms is not None) or needs_rent != (self.rent_terms is not None):
-            raise ValueError("terms must match purpose: sale_terms for sale, rent_terms for rent")
+            raise rule_error("terms_purpose_mismatch", "terms must match purpose: sale_terms for sale, rent_terms for rent")
         return self
 
 
@@ -249,6 +250,10 @@ def _validate_sale_terms(terms: SaleTermsIn | None, prop: Property) -> dict | No
     _reject_owner_verified(data)
     try:
         SaleInput(area_sqm=prop.area_sqm, **data)
+    except ValidationError as exc:
+        # Keep each rule's code (e.g. installments_required) so clients can localize it.
+        details = [{"loc": ["body", "sale_terms", *e["loc"]], "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
+        raise ValidationFailed(str(exc), code="invalid_sale_terms", details=details) from exc
     except ValueError as exc:
         raise ValidationFailed(str(exc), code="invalid_sale_terms") from exc
     return data

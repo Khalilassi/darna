@@ -28,6 +28,7 @@ from app.core.deps import client_ip, current_user
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.notify import notify
 from app.core.state_machine import StateMachine
+from app.core.validation import rule_error
 from app.models.entities import (
     District,
     Listing,
@@ -125,13 +126,13 @@ class ClaimIn(BaseModel):
     def _rep(self) -> ClaimIn:
         if self.capacity == ClaimCapacity.legal_representative:
             if not self.principal_name or not self.authority_scope:
-                raise ValueError("legal representatives must name the principal and the scope of authority")
+                raise rule_error("authority_details_required", "legal representatives must name the principal and the scope of authority")
             if not set(self.authority_scope) <= AUTHORITY_SCOPES:
-                raise ValueError(f"authority_scope must be a subset of {sorted(AUTHORITY_SCOPES)}")
+                raise rule_error("invalid_authority_scope", f"authority_scope must be a subset of {sorted(AUTHORITY_SCOPES)}")
             if self.authority_expires_on and self.authority_expires_on <= date.today():
-                raise ValueError("authority has already expired")
+                raise rule_error("authority_expired", "authority has already expired")
         elif self.principal_name or self.authority_scope:
-            raise ValueError("principal and scope apply only to legal representatives")
+            raise rule_error("authority_not_applicable", "principal and scope apply only to legal representatives")
         return self
 
 

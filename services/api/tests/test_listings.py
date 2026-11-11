@@ -118,6 +118,7 @@ def test_invalid_sale_terms_rejected(make_user, project, reviewer):
     terms = {**SALE_TERMS, "payment_mode": "cash"}  # cash with installments is contradictory
     r = owner.post("/listings", json={"property_id": pid, "purpose": "sale", "title": "Contradictory terms", "sale_terms": terms})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_sale_terms"
+    assert [d["type"] for d in r.json()["error"]["details"]] == ["cash_resale_has_installments"]
     r = owner.post("/listings", json={"property_id": pid, "purpose": "sale", "title": "Missing terms here"})
     assert r.status_code == 422
 
