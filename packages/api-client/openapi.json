@@ -1128,6 +1128,20 @@
    },
    "ChecklistOut": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "submit",
+        "accept",
+        "waive",
+        "reopen"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "code": {
       "title": "Code",
       "type": "string"
@@ -7840,6 +7854,21 @@
    },
    "ViewingOut": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "confirm",
+        "decline",
+        "cancel",
+        "complete",
+        "no_show"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -7912,6 +7941,21 @@
    },
    "ViewingWithListing": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "confirm",
+        "decline",
+        "cancel",
+        "complete",
+        "no_show"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",

@@ -1849,6 +1849,11 @@ export interface components {
         };
         /** ChecklistOut */
         ChecklistOut: {
+            /**
+             * Allowed Actions
+             * @default []
+             */
+            allowed_actions: ("submit" | "accept" | "waive" | "reopen")[];
             /** Code */
             code: string;
             /** Document Id */
@@ -4053,6 +4058,11 @@ export interface components {
         /** ViewingOut */
         ViewingOut: {
             /**
+             * Allowed Actions
+             * @default []
+             */
+            allowed_actions: ("confirm" | "decline" | "cancel" | "complete" | "no_show")[];
+            /**
              * Created At
              * Format: date-time
              */
@@ -4093,6 +4103,11 @@ export interface components {
         ViewingStatus: "requested" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show";
         /** ViewingWithListing */
         ViewingWithListing: {
+            /**
+             * Allowed Actions
+             * @default []
+             */
+            allowed_actions: ("confirm" | "decline" | "cancel" | "complete" | "no_show")[];
             /**
              * Created At
              * Format: date-time
