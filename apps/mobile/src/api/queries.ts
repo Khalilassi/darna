@@ -17,6 +17,7 @@ export const qk = {
   myProperties: ["properties", "mine"] as const,
   myListings: ["listings", "mine"] as const,
   myListing: (id: string) => ["listings", "mine", id] as const,
+  performance: (id: string, days: number) => ["listings", "mine", id, "performance", days] as const,
   verifications: ["verifications"] as const,
   supportCases: ["support"] as const,
   priceHistory: (id: string) => ["listing", id, "price-history"] as const,
@@ -117,6 +118,14 @@ export function useMyListing(id: string) {
   });
 }
 
+/** Owner-only daily activity, totals and funnel for one listing (`days` 7..180). */
+export function useListingPerformance(id: string, days: number) {
+  return useQuery({
+    queryKey: qk.performance(id, days),
+    queryFn: async () => unwrap(await api.GET("/listings/mine/{listing_id}/performance", { params: { path: { listing_id: id }, query: { days } } })),
+  });
+}
+
 export function useVerifications() {
   return useQuery({ queryKey: qk.verifications, queryFn: async () => unwrap(await api.GET("/verifications")) });
 }
@@ -185,7 +194,6 @@ export function useCashComparison(listingId: string, discountRate: number | null
   return useQuery({
     queryKey: ["listing", listingId, "compare", discountRate, cashPrice],
     enabled: discountRate !== null,
-    placeholderData: (prev) => prev,
     queryFn: async () =>
       unwrap(
         await api.GET("/listings/{listing_id}/financials/compare", {
