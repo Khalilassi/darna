@@ -28,6 +28,8 @@ _Last updated: 2026-11-11. Future sessions: read this first, then `README.md` an
 | Phone verification by SMS code (dev SMS sender only) | ✅ | ✅ verify screen + status badge | – | – |
 | Account lockout after repeated failed sign-ins | ✅ | ✅ message with minutes left | ✅ (shared API) | – |
 | S3-compatible storage, key rotation, ClamAV upload scanning, Redis rate limiting | ✅ | – | – | – |
+| Owner listing performance: daily views/saves/inquiries/viewings/offers, funnel | ✅ | 🚧 in progress | – | – |
+| Observability: request ids (header, error bodies, logs), JSON logs, Prometheus /metrics | ✅ | – | – | – |
 | Audit log, analytics, user management (roles, suspension) | ✅ | – | ✅ | – |
 | EN/AR + RTL, EGP formatting, light/dark | – | ✅ | – | ✅ |
 | Public marketing site, SEO (metadata, sitemap, robots, hreflang) | – | – | – | ✅ |
@@ -40,7 +42,7 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 
 | Check | Result |
 |---|---|
-| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **144 passed** |
+| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **150 passed** |
 | `services/api`: `ruff check .` | pass |
 | `services/api`: `alembic upgrade head` + `alembic check` (models match migrations) | pass |
 | `apps/mobile`: `tsc --noEmit` / `jest` | pass / **59 passed** (11 suites) |
@@ -53,6 +55,7 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 | Playwright: mobile notification settings persist; web date field | pass |
 | Playwright: mobile market insights, cash-vs-installments, saved search; phone verification with a real code from the dev SMS log | pass |
 | Redis rate limiter against a real Redis 7.0 server (two clients share one limit) | pass |
+| Admin (12 checks) and web (24 checks) smoke suites against production builds — now also a CI job (`e2e`) | pass locally |
 | Docker image / docker-compose | **not run** (no Docker daemon in this environment) |
 | GitHub Actions CI (`api` + `js` jobs) | **green** on `995192f`; earlier WIP snapshot commits failed as expected |
 | Native iOS/Android device or emulator runs | **not run**; no APK/IPA has been produced |
