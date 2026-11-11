@@ -10,11 +10,13 @@ export function SiteHeader({ locale, t }: { locale: Locale; t: Dict }) {
         {t.nav.skip}
       </a>
       <div className="container header-inner">
-        <Link href={`/${locale}`} className="logo" aria-label={`${locale === "ar" ? brand.nameAr : brand.name} — ${t.nav.home}`}>
+        {/* Visible brand text starts the accessible name (WCAG 2.5.3 label-in-name); "— Home" is for screen readers. */}
+        <Link href={`/${locale}`} className="logo">
           <span className="logo-mark" aria-hidden>
             د
           </span>
           <span>{locale === "ar" ? brand.nameAr : brand.name}</span>
+          <span className="sr-only"> — {t.nav.home}</span>
         </Link>
         <nav aria-label={t.nav.home} className="header-nav">
           <Link href={`/${locale}/listings`}>{t.nav.listings}</Link>

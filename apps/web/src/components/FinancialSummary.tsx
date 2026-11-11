@@ -21,7 +21,8 @@ function Figure({ label: l, value, emphasis }: { label: string; value: string; e
 function LineItems({ items, locale, t }: { items: LineItem[]; locale: Locale; t: Dict }) {
   if (!items.length) return null;
   return (
-    <div className="table-scroll">
+    // Scrolls horizontally on phones, so it must be keyboard-focusable (WCAG 2.1.1) and named for screen readers.
+    <div className="table-scroll" tabIndex={0} role="region" aria-label={t.finance.breakdown}>
       <table className="cost-table">
         <caption>{t.finance.breakdown}</caption>
         <thead>
