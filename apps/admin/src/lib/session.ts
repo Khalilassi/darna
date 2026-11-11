@@ -7,7 +7,7 @@ const STORAGE_KEY = "darna.admin.session";
 export type ApiClient = ReturnType<typeof createApiClient>;
 export type Me = Schemas["MeDetailOut"];
 
-interface Tokens {
+export interface Tokens {
   access_token: string;
   refresh_token: string;
 }
@@ -67,6 +67,11 @@ export class Session {
   private setTokens(t: Tokens | null) {
     this.tokens = t;
     writeStorage(t);
+  }
+
+  /** Switch to tokens issued by the API outside login (e.g. the fresh MFA session from /auth/mfa/confirm). */
+  adoptTokens(t: Tokens) {
+    this.setTokens(t);
   }
 
   call: Call = async (fn) => {

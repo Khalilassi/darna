@@ -17,6 +17,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    Computed,
     Date,
     DateTime,
     Enum,
@@ -29,7 +30,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, TimestampMixin, utcnow
@@ -75,6 +76,9 @@ def _in_list(values) -> str:
 
 # --------------------------------------------------------------------------- users & auth
 class User(IdMixin, TimestampMixin, Base):
+    # Set per request from the access token (not stored): did this session use a second factor?
+    session_mfa = False
+
     __tablename__ = "users"
     # A verified phone number belongs to one account only.
     __table_args__ = (
@@ -98,6 +102,9 @@ class User(IdMixin, TimestampMixin, Base):
     totp_secret_encrypted: Mapped[str | None] = mapped_column(String(300))
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     totp_last_counter: Mapped[int | None] = mapped_column(Integer)
+    # One-time staff MFA enrolment code issued by an admin (only its hash is stored).
+    mfa_enrollment_code_hash: Mapped[str | None] = mapped_column(String(64))
+    mfa_enrollment_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PhoneVerification(IdMixin, Base):
@@ -105,7 +112,7 @@ class PhoneVerification(IdMixin, Base):
 
     __tablename__ = "phone_verifications"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    phone: Mapped[str] = mapped_column(String(32))
+    phone: Mapped[str] = mapped_column(String(32), index=True)
     code_hash: Mapped[str] = mapped_column(String(64))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -131,6 +138,8 @@ class RefreshToken(IdMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The session was established with a second factor; refreshed access tokens keep this.
+    mfa: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
 # --------------------------------------------------------------------------- catalog
@@ -253,6 +262,9 @@ class VerificationRequest(IdMixin, TimestampMixin, Base):
     decision_note: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     document_ids: Mapped[list[str]] = mapped_column(Json, default=list)
+    # Financial requests: hash of the sale terms the reviewer is asked to check (approval is refused
+    # if the owner edited them afterwards).
+    terms_hash: Mapped[str | None] = mapped_column(String(64))
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
 
@@ -268,10 +280,7 @@ class Listing(IdMixin, TimestampMixin, Base):
             postgresql_where=text(f"status IN ({_in_list(LISTING_OCCUPYING_STATUSES)})"),
         ),
         Index("ix_listings_status_published", "status", "published_at"),
-        # Trigram indexes make ILIKE '%term%' text search fast for selective terms (pg_trgm extension).
-        Index("ix_listings_title_trgm", "title", postgresql_using="gin", postgresql_ops={"title": "gin_trgm_ops"}),
-        Index("ix_listings_description_trgm", "description", postgresql_using="gin",
-              postgresql_ops={"description": "gin_trgm_ops"}),
+        # GIN indexes on search_text (pg_trgm) and search_tsv are created in migration 751cc70de6dd.
     )
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -280,6 +289,12 @@ class Listing(IdMixin, TimestampMixin, Base):
     status: Mapped[ListingStatus] = mapped_column(E(ListingStatus, "listing_status"), default=ListingStatus.draft)
     title: Mapped[str] = mapped_column(String(140))
     description: Mapped[str] = mapped_column(Text, default="")
+    # Maintained by Postgres (generated columns, migration 751cc70de6dd); never written by the app.
+    search_text: Mapped[str | None] = mapped_column(
+        Text, Computed("darna_search_norm(coalesce(title, '') || ' ' || coalesce(description, ''))", persisted=True),
+        deferred=True)
+    search_tsv: Mapped[str | None] = mapped_column(
+        TSVECTOR, Computed("darna_listing_tsv(title, description)", persisted=True), deferred=True)
     # Sale financial input (see app.finance.engine.SaleInput); validated JSON with Decimal strings.
     sale_terms: Mapped[dict | None] = mapped_column(Json)
     # Rent input (see app.finance.engine.RentInput).

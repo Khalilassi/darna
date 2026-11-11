@@ -42,6 +42,7 @@ def current_user_optional(
     user = db.get(User, uuid.UUID(payload["sub"]))
     if user is None or not user.is_active:
         raise Unauthorized("Account unavailable", code="account_unavailable")
+    user.session_mfa = payload.get("mfa") is True
     return user
 
 
@@ -51,12 +52,28 @@ def current_user(user: User | None = Depends(current_user_optional)) -> User:
     return user
 
 
+def staff_mfa_satisfied(user: User) -> bool:
+    """With the staff-MFA policy on, the account must have MFA enabled AND this session must have used it:
+    a session opened with only a password before enrolment does not gain staff access afterwards."""
+    if not get_settings().require_staff_mfa:
+        return True
+    return user.mfa_enabled_at is not None and user.session_mfa
+
+
+def has_permission(user: User, permission: str) -> bool:
+    """Role grants the permission AND the staff-MFA policy is met. Use this for any role-based check
+    outside ``require()`` so the MFA requirement cannot be bypassed."""
+    return user.role in PERMISSIONS[permission] and staff_mfa_satisfied(user)
+
+
 def require(permission: str) -> Callable[..., User]:
     def dep(user: User = Depends(current_user)) -> User:
         if user.role not in PERMISSIONS[permission]:
             raise Forbidden(f"Missing permission {permission}", code="missing_permission")
-        if get_settings().require_staff_mfa and user.mfa_enabled_at is None:
-            raise Forbidden("Set up two-factor authentication to use staff tools", code="mfa_enrollment_required")
+        if not staff_mfa_satisfied(user):
+            if user.mfa_enabled_at is None:
+                raise Forbidden("Set up two-factor authentication to use staff tools", code="mfa_enrollment_required")
+            raise Forbidden("Sign in again with your two-factor code to use staff tools", code="mfa_session_required")
         return user
 
     return dep

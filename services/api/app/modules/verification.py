@@ -1,6 +1,8 @@
 """Identity verification submissions (user side). Review happens in app.modules.admin."""
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from datetime import datetime
 
@@ -22,11 +24,16 @@ from app.schemas.common import ORM
 
 router = APIRouter(prefix="/verifications", tags=["verification"])
 
+def sale_terms_hash(terms: dict | None) -> str:
+    """Stable fingerprint of a listing's sale terms (key order and whitespace do not matter)."""
+    return hashlib.sha256(json.dumps(terms or {}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 VERIFICATION_FSM = StateMachine(
     "verification",
     {
         VS.submitted: [VS.under_review, VS.approved, VS.rejected, VS.more_info_required, VS.withdrawn],
-        VS.under_review: [VS.approved, VS.rejected, VS.more_info_required],
+        VS.under_review: [VS.approved, VS.rejected, VS.more_info_required, VS.withdrawn],
         VS.more_info_required: [VS.submitted, VS.withdrawn, VS.rejected],
     },
     terminal=[VS.approved, VS.rejected, VS.withdrawn],
@@ -112,7 +119,7 @@ def submit_financial(body: FinancialVerificationIn, request: Request, user: User
     if pending:
         raise Conflict("A financial verification is already in review", code="verification_pending")
     vr = VerificationRequest(user_id=user.id, kind=VerificationKind.financial, listing_id=listing.id,
-                             document_ids=[str(d.id) for d in docs], note=body.note)
+                             document_ids=[str(d.id) for d in docs], note=body.note, terms_hash=sale_terms_hash(listing.sale_terms))
     db.add(vr)
     db.flush()
     audit(db, "verification.submitted", "verification", vr.id, actor_id=user.id, data={"kind": "financial"}, ip=client_ip(request))

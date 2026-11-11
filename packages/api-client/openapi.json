@@ -559,6 +559,18 @@
       "title": "Is Active",
       "type": "boolean"
      },
+     "mfa_enabled_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mfa Enabled At"
+     },
      "phone": {
       "anyOf": [
        {
@@ -2159,6 +2171,25 @@
     "title": "DuplicateCandidate",
     "type": "object"
    },
+   "EnrollmentCodeOut": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "expires_at"
+    ],
+    "title": "EnrollmentCodeOut",
+    "type": "object"
+   },
    "EventOut": {
     "properties": {
      "actor_id": {
@@ -2394,87 +2425,6 @@
      }
     },
     "title": "HTTPValidationError",
-    "type": "object"
-   },
-   "IdentityCheckOut": {
-    "properties": {
-     "exists": {
-      "title": "Exists",
-      "type": "boolean"
-     },
-     "has_live_listing": {
-      "title": "Has Live Listing",
-      "type": "boolean"
-     },
-     "property_id": {
-      "anyOf": [
-       {
-        "format": "uuid",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Property Id"
-     }
-    },
-    "required": [
-     "exists",
-     "property_id",
-     "has_live_listing"
-    ],
-    "title": "IdentityCheckOut",
-    "type": "object"
-   },
-   "IdentityIn": {
-    "properties": {
-     "building_code": {
-      "maxLength": 20,
-      "minLength": 1,
-      "title": "Building Code",
-      "type": "string"
-     },
-     "district_id": {
-      "format": "uuid",
-      "title": "District Id",
-      "type": "string"
-     },
-     "group_code": {
-      "maxLength": 20,
-      "minLength": 1,
-      "title": "Group Code",
-      "type": "string"
-     },
-     "project_id": {
-      "format": "uuid",
-      "title": "Project Id",
-      "type": "string"
-     },
-     "property_type": {
-      "$ref": "#/components/schemas/PropertyType"
-     },
-     "unit_code": {
-      "anyOf": [
-       {
-        "maxLength": 20,
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Unit Code"
-     }
-    },
-    "required": [
-     "project_id",
-     "district_id",
-     "group_code",
-     "building_code",
-     "property_type"
-    ],
-    "title": "IdentityIn",
     "type": "object"
    },
    "Installment-Input": {
@@ -3769,6 +3719,32 @@
     "title": "MfaDisableIn",
     "type": "object"
    },
+   "MfaSetupIn": {
+    "properties": {
+     "enrollment_code": {
+      "anyOf": [
+       {
+        "maxLength": 32,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Enrollment Code"
+     },
+     "password": {
+      "maxLength": 128,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "password"
+    ],
+    "title": "MfaSetupIn",
+    "type": "object"
+   },
    "MfaSetupOut": {
     "properties": {
      "otpauth_uri": {
@@ -4781,6 +4757,37 @@
      "page_size"
     ],
     "title": "Page[ListingCard]",
+    "type": "object"
+   },
+   "Page_QueueItem_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/QueueItem"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "page": {
+      "title": "Page",
+      "type": "integer"
+     },
+     "page_size": {
+      "title": "Page Size",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total",
+     "page",
+     "page_size"
+    ],
+    "title": "Page[QueueItem]",
     "type": "object"
    },
    "PartyRole": {
@@ -6118,6 +6125,51 @@
      "attest_not_broker"
     ],
     "title": "RegisterIn",
+    "type": "object"
+   },
+   "RegisterOut": {
+    "properties": {
+     "claim": {
+      "$ref": "#/components/schemas/ClaimOut"
+     },
+     "claimed_existing": {
+      "default": false,
+      "title": "Claimed Existing",
+      "type": "boolean"
+     },
+     "live_listing_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Live Listing Id"
+     },
+     "live_listing_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ListingStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "property": {
+      "$ref": "#/components/schemas/PropertyOut"
+     }
+    },
+    "required": [
+     "property",
+     "claim",
+     "live_listing_id",
+     "live_listing_status"
+    ],
+    "title": "RegisterOut",
     "type": "object"
    },
    "RegisterPropertyIn": {
@@ -9082,8 +9134,58 @@
     ]
    }
   },
+  "/admin/users/{user_id}/mfa-enrollment-code": {
+   "post": {
+    "description": "One-time code a staff member needs to enrol MFA (shown once; give it to them out of band).",
+    "operationId": "issue_mfa_enrollment_code_admin_users__user_id__mfa_enrollment_code_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "user_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "User Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EnrollmentCodeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Issue Mfa Enrollment Code",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
   "/admin/verifications": {
    "get": {
+    "description": "Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries.",
     "operationId": "verification_queue_admin_verifications_get",
     "parameters": [
      {
@@ -9117,6 +9219,29 @@
        ],
        "title": "Kind"
       }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 25,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
      }
     ],
     "responses": {
@@ -9124,11 +9249,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/QueueItem"
-         },
-         "title": "Response Verification Queue Admin Verifications Get",
-         "type": "array"
+         "$ref": "#/components/schemas/Page_QueueItem_"
         }
        }
       },
@@ -9386,7 +9507,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/Ok"
+         "$ref": "#/components/schemas/TokenOut"
         }
        }
       },
@@ -9464,8 +9585,18 @@
   },
   "/auth/mfa/setup": {
    "post": {
-    "description": "Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.",
+    "description": "Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.\n\nRe-checks the password so a stolen access token alone cannot bind an attacker's authenticator.",
     "operationId": "mfa_setup_auth_mfa_setup_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaSetupIn"
+       }
+      }
+     },
+     "required": true
+    },
     "responses": {
      "200": {
       "content": {
@@ -9476,6 +9607,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "security": [
@@ -12320,6 +12461,7 @@
   },
   "/properties": {
    "post": {
+    "description": "Register a unit with an ownership claim; if the unit already exists, the submission becomes a claim on it.\n\nThere is deliberately no free \"does this unit exist?\" lookup: combined with the public listing fields\n(group, floor, type) it would reveal the private building and unit numbers of listed homes.",
     "operationId": "register_property_properties_post",
     "requestBody": {
      "content": {
@@ -12336,7 +12478,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/MyPropertyOut"
+         "$ref": "#/components/schemas/RegisterOut"
         }
        }
       },
@@ -12407,53 +12549,6 @@
      }
     ],
     "summary": "Withdraw Claim",
-    "tags": [
-     "properties"
-    ]
-   }
-  },
-  "/properties/identity-check": {
-   "post": {
-    "description": "Lets an owner learn whether a unit already exists, so they claim it instead of duplicating it.",
-    "operationId": "identity_check_properties_identity_check_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/IdentityIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/IdentityCheckOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Identity Check",
     "tags": [
      "properties"
     ]

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,8 @@ router = APIRouter(prefix="/auth/phone", tags=["me"])
 CODE_TTL = timedelta(minutes=10)
 RESEND_COOLDOWN = timedelta(seconds=60)
 MAX_PER_HOUR = 5
+MAX_PER_NUMBER_PER_HOUR = 5
+MAX_PER_NUMBER_PER_DAY = 10
 MAX_ATTEMPTS = 5
 EG_MOBILE = re.compile(r"^\+201[0125]\d{8}$")
 
@@ -78,8 +80,9 @@ def start(body: StartIn, request: Request, user: User = Depends(current_user), d
     taken = db.scalar(select(User.id).where(User.phone == body.phone, User.phone_verified_at.is_not(None), User.id != user.id))
     if taken:
         raise Conflict("This number is verified on another account", code="phone_in_use")
-    # Serialize sends per user so concurrent requests cannot bypass the cooldown or hourly limit.
+    # Serialize sends per user and per destination number so concurrent requests cannot bypass the limits.
     db.execute(select(User.id).where(User.id == user.id).with_for_update())
+    db.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"sms:{body.phone}"))))
     now = utcnow()
     recent = db.scalars(select(PhoneVerification).where(PhoneVerification.user_id == user.id,
                                                         PhoneVerification.created_at > now - timedelta(hours=1))
@@ -89,6 +92,15 @@ def start(body: StartIn, request: Request, user: User = Depends(current_user), d
         raise RateLimited("Please wait before requesting another code", code="sms_cooldown", details={"retry_after_seconds": wait})
     if len(recent) >= MAX_PER_HOUR:
         raise RateLimited("Too many codes requested. Try again later.", code="sms_hourly_limit", details={"retry_after_seconds": 3600})
+    # Per destination number across all accounts: stops several accounts flooding one person's phone
+    # (and running up SMS costs).
+    to_number = db.scalar(select(func.count()).select_from(PhoneVerification).where(
+        PhoneVerification.phone == body.phone, PhoneVerification.created_at > now - timedelta(days=1)))
+    to_number_hour = db.scalar(select(func.count()).select_from(PhoneVerification).where(
+        PhoneVerification.phone == body.phone, PhoneVerification.created_at > now - timedelta(hours=1)))
+    if (to_number or 0) >= MAX_PER_NUMBER_PER_DAY or (to_number_hour or 0) >= MAX_PER_NUMBER_PER_HOUR:
+        raise RateLimited("Too many codes were sent to this number. Try again later.", code="sms_number_limit",
+                          details={"retry_after_seconds": 3600})
     sender = sms_sender()  # raises sms_unavailable before anything is stored if no provider is configured
     code = f"{secrets.randbelow(10**6):06d}"
     pv = PhoneVerification(user_id=user.id, phone=body.phone, code_hash=_hash(user.id, body.phone, code), expires_at=now + CODE_TTL)

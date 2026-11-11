@@ -16,9 +16,9 @@ target_metadata = Base.metadata
 
 
 def include_object(obj, name, type_, reflected, compare_to):
-    # Operator-class GIN indexes (pg_trgm) are created by an explicit migration; Alembic cannot match a
-    # reflected opclass index against the model definition and would report them as missing every time.
-    if type_ == "index" and name and name.endswith("_trgm"):
+    # Text-search GIN indexes (pg_trgm opclass / expression indexes) live only in explicit migrations;
+    # Alembic cannot compare them with model definitions and would report them as changed every time.
+    if type_ == "index" and name and name.endswith(("_trgm", "_fts")):
         return False
     return True
 

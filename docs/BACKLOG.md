@@ -8,12 +8,16 @@ Legend: P1 next, P2 soon, P3 later.
 - ✅ Redis rate limiting; request ids, JSON logs, Prometheus metrics. P3 distributed tracing.
 - ✅ Server-computed `allowed_actions` on viewings and checklist items (one rule function per resource, used by both the endpoint and the response).
 - ✅ Coded validation errors (`type` per rule + `ctx` limits), localized in the mobile app. P3 same localization in admin/web forms.
-- ✅ Search benchmark + trigram indexes. P3 Postgres full-text search (Arabic + English).
+- ✅ Search benchmark + trigram indexes; Arabic-normalized substring + English/Arabic stemmed full-text search.
 
 ## Security
 - ✅ Staff MFA (backend + admin screens); account lockout.
 - ✅ Malware scanning (ClamAV), S3 storage with SSE/KMS, key rotation.
-- ✅ Dependency scanning in CI (pip-audit, npm audit) + Dependabot. P2 Penetration test.
+- ✅ Dependency scanning in CI (pip-audit, npm audit) + Dependabot. P2 External penetration test.
+- ✅ Internal security review (2026-11-11): 10 findings fixed, see `docs/architecture/security.md`.
+- ✅ Admin-issued one-time codes for staff MFA enrolment (+ `python -m app.staff_mfa_code` bootstrap CLI).
+- P2 Let the approved owner (or a reviewer) correct property attributes registered by someone else.
+- P2 Set `FORWARDED_ALLOW_IPS` to the load balancer range at deployment (rate limits key on client IP).
 
 ## Product
 - ✅ Push (backend, mobile registration, deep links, settings). P1 verify on a device with an EAS project.

@@ -297,6 +297,26 @@ export interface paths {
         patch: operations["update_user_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/admin/users/{user_id}/mfa-enrollment-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Mfa Enrollment Code
+         * @description One-time code a staff member needs to enrol MFA (shown once; give it to them out of band).
+         */
+        post: operations["issue_mfa_enrollment_code_admin_users__user_id__mfa_enrollment_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/verifications": {
         parameters: {
             query?: never;
@@ -304,7 +324,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Verification Queue */
+        /**
+         * Verification Queue
+         * @description Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries.
+         */
         get: operations["verification_queue_admin_verifications_get"];
         put?: never;
         post?: never;
@@ -429,6 +452,8 @@ export interface paths {
         /**
          * Mfa Setup
          * @description Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.
+         *
+         *     Re-checks the password so a stolen access token alone cannot bind an attacker's authenticator.
          */
         post: operations["mfa_setup_auth_mfa_setup_post"];
         delete?: never;
@@ -1137,7 +1162,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register Property */
+        /**
+         * Register Property
+         * @description Register a unit with an ownership claim; if the unit already exists, the submission becomes a claim on it.
+         *
+         *     There is deliberately no free "does this unit exist?" lookup: combined with the public listing fields
+         *     (group, floor, type) it would reveal the private building and unit numbers of listed homes.
+         */
         post: operations["register_property_properties_post"];
         delete?: never;
         options?: never;
@@ -1156,26 +1187,6 @@ export interface paths {
         put?: never;
         /** Withdraw Claim */
         post: operations["withdraw_claim_properties_claims__claim_id__withdraw_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/properties/identity-check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Identity Check
-         * @description Lets an owner learn whether a unit already exists, so they claim it instead of duplicating it.
-         */
-        post: operations["identity_check_properties_identity_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1666,6 +1677,8 @@ export interface components {
             identity_verified_at: string | null;
             /** Is Active */
             is_active: boolean;
+            /** Mfa Enabled At */
+            mfa_enabled_at?: string | null;
             /** Phone */
             phone: string | null;
             role: components["schemas"]["Role"];
@@ -2246,6 +2259,16 @@ export interface components {
             /** Property Ids */
             property_ids: string[];
         };
+        /** EnrollmentCodeOut */
+        EnrollmentCodeOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** EventOut */
         EventOut: {
             /** Actor Id */
@@ -2335,35 +2358,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** IdentityCheckOut */
-        IdentityCheckOut: {
-            /** Exists */
-            exists: boolean;
-            /** Has Live Listing */
-            has_live_listing: boolean;
-            /** Property Id */
-            property_id: string | null;
-        };
-        /** IdentityIn */
-        IdentityIn: {
-            /** Building Code */
-            building_code: string;
-            /**
-             * District Id
-             * Format: uuid
-             */
-            district_id: string;
-            /** Group Code */
-            group_code: string;
-            /**
-             * Project Id
-             * Format: uuid
-             */
-            project_id: string;
-            property_type: components["schemas"]["PropertyType"];
-            /** Unit Code */
-            unit_code?: string | null;
         };
         /** Installment */
         "Installment-Input": {
@@ -2774,6 +2768,13 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MfaSetupIn */
+        MfaSetupIn: {
+            /** Enrollment Code */
+            enrollment_code?: string | null;
+            /** Password */
+            password: string;
+        };
         /** MfaSetupOut */
         MfaSetupOut: {
             /** Otpauth Uri */
@@ -3079,6 +3080,17 @@ export interface components {
         Page_ListingCard_: {
             /** Items */
             items: components["schemas"]["ListingCard"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** Page[QueueItem] */
+        Page_QueueItem_: {
+            /** Items */
+            items: components["schemas"]["QueueItem"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -3525,6 +3537,19 @@ export interface components {
             password: string;
             /** Phone */
             phone?: string | null;
+        };
+        /** RegisterOut */
+        RegisterOut: {
+            claim: components["schemas"]["ClaimOut"];
+            /**
+             * Claimed Existing
+             * @default false
+             */
+            claimed_existing: boolean;
+            /** Live Listing Id */
+            live_listing_id: string | null;
+            live_listing_status: components["schemas"]["ListingStatus"] | null;
+            property: components["schemas"]["PropertyOut"];
         };
         /** RegisterPropertyIn */
         RegisterPropertyIn: {
@@ -4728,11 +4753,44 @@ export interface operations {
             };
         };
     };
+    issue_mfa_enrollment_code_admin_users__user_id__mfa_enrollment_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentCodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     verification_queue_admin_verifications_get: {
         parameters: {
             query?: {
                 status?: components["schemas"]["VerificationStatus"][];
                 kind?: components["schemas"]["VerificationKind"] | null;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -4746,7 +4804,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QueueItem"][];
+                    "application/json": components["schemas"]["Page_QueueItem_"];
                 };
             };
             /** @description Validation Error */
@@ -4933,7 +4991,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok"];
+                    "application/json": components["schemas"]["TokenOut"];
                 };
             };
             /** @description Validation Error */
@@ -4987,7 +5045,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaSetupIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4996,6 +5058,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MfaSetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6516,7 +6587,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MyPropertyOut"];
+                    "application/json": components["schemas"]["RegisterOut"];
                 };
             };
             /** @description Validation Error */
@@ -6548,39 +6619,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClaimOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    identity_check_properties_identity_check_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IdentityIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdentityCheckOut"];
                 };
             };
             /** @description Validation Error */

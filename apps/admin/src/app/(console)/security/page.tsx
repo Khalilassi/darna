@@ -11,12 +11,13 @@ import { useToast } from "@/lib/toast";
 const onlyDigits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
 export default function SecurityPage() {
-  const { me, refreshMe } = useAuth();
+  const { me, refreshMe, adoptTokens } = useAuth();
   const api = useApi();
   const toast = useToast();
   const [setup, setSetup] = useState<Setup | null>(null);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [enrollmentCode, setEnrollmentCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const enabled = !!me?.mfa_enabled_at;
@@ -33,12 +34,20 @@ export default function SecurityPage() {
     }
   }
 
-  const start = () => run(async () => setSetup(await api.mfaSetup()));
+  const start = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      setSetup(await api.mfaSetup(password, enrollmentCode.trim()));
+      setPassword("");
+      setEnrollmentCode("");
+    });
+  };
 
   const confirm = (e: FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      await api.mfaConfirm(code);
+      // Confirming ends every earlier session; continue with the fresh two-factor session it returns.
+      adoptTokens(await api.mfaConfirm(code));
       setSetup(null);
       setCode("");
       await refreshMe();
@@ -95,11 +104,34 @@ export default function SecurityPage() {
         {!enabled && !setup && (
           <>
             <p>Use an authenticator app such as Google Authenticator, Microsoft Authenticator, 1Password or Authy.</p>
-            <div>
-              <button type="button" className="btn btn-primary" onClick={start} disabled={busy}>
-                {busy ? "Preparing…" : "Set up two-factor authentication"}
-              </button>
-            </div>
+            <form className="stack gap-md" onSubmit={start} aria-label="Start two-factor setup">
+              <div className="field">
+                <label htmlFor="setup-password">Confirm your password</label>
+                <input id="setup-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              {me?.role !== "member" && (
+                <div className="field">
+                  <label htmlFor="setup-enrollment-code">Setup code from an administrator</label>
+                  <input
+                    id="setup-enrollment-code"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={32}
+                    aria-describedby="setup-enrollment-help"
+                    value={enrollmentCode}
+                    onChange={(e) => setEnrollmentCode(e.target.value.toUpperCase())}
+                  />
+                  <p id="setup-enrollment-help" className="muted small">
+                    Staff accounts need a one-time code (format XXXX-XXXX-XXXX). Ask an administrator to issue one under Users.
+                  </p>
+                </div>
+              )}
+              <div>
+                <button type="submit" className="btn btn-primary" disabled={busy || !password}>
+                  {busy ? "Preparing…" : "Set up two-factor authentication"}
+                </button>
+              </div>
+            </form>
           </>
         )}
 

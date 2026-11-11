@@ -107,20 +107,37 @@ def test_totp_rfc6238_vectors():
     assert totp.verify(secret, "12345", None) is None
 
 
-def test_staff_mfa_enrollment_login_and_enforcement(make_user, client, monkeypatch):
+def test_staff_mfa_enrollment_login_and_enforcement(make_user, client, monkeypatch, db):
     from app.core.config import get_settings
     from app.models.enums import Role
     staff = make_user(Role.reviewer, "Mfa Reviewer")
     monkeypatch.setattr(get_settings(), "require_staff_mfa", True)
     r = staff.get("/admin/verifications")
     assert r.status_code == 403 and r.json()["error"]["code"] == "mfa_enrollment_required"
-    setup = staff.post("/auth/mfa/setup").json()
+    r = staff.post("/auth/mfa/setup", json={"password": "wrong-password-1"})
+    assert r.status_code == 401  # a stolen access token alone cannot enrol an authenticator
+    from app.core import mfa_enrollment
+    from app.models.entities import User
+    enrol_code, _ = mfa_enrollment.issue(db.get(User, staff.id))
+    db.commit()
+    setup = staff.post("/auth/mfa/setup", json={"password": PASSWORD, "enrollment_code": enrol_code}).json()
     assert setup["otpauth_uri"].startswith("otpauth://totp/")
     assert staff.post("/auth/mfa/confirm", json={"code": "000000"}).status_code in (422,)
     now = time.time()
     code = totp.code_at(setup["secret"], int(now // 30))
-    assert staff.post("/auth/mfa/confirm", json={"code": code}).status_code == 200
+    old_token = staff.token
+    confirmed = staff.post("/auth/mfa/confirm", json={"code": code})
+    assert confirmed.status_code == 200
+    # The password-only session that existed before enrolment does not gain staff access...
+    r = staff.get("/admin/verifications")
+    assert r.status_code == 403 and r.json()["error"]["code"] == "mfa_session_required"
+    # ...but the fresh MFA session returned by confirm does, and keeps it across refresh.
+    staff.token = confirmed.json()["access_token"]
     assert staff.get("/admin/verifications").status_code == 200
+    refreshed = client.post("/auth/refresh", json={"refresh_token": confirmed.json()["refresh_token"]}).json()
+    staff.token = refreshed["access_token"]
+    assert staff.get("/admin/verifications").status_code == 200
+    assert old_token != staff.token
     r = client.post("/auth/login", json={"email": staff.email, "password": PASSWORD})
     assert r.status_code == 401 and r.json()["error"]["code"] == "mfa_required"
     r = client.post("/auth/login", json={"email": staff.email, "password": PASSWORD, "totp_code": code})

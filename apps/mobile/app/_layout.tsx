@@ -100,7 +100,6 @@ function Navigation() {
         <Stack.Screen name="owner/index" options={{ title: t("owner.hubTitle") }} />
         <Stack.Screen name="owner/verify" options={{ title: t("verify.title") }} />
         <Stack.Screen name="owner/property-new" options={{ title: t("property.title") }} />
-        <Stack.Screen name="owner/claim/[propertyId]" options={{ title: t("claim.title") }} />
         <Stack.Screen name="owner/listing-new" options={{ title: t("listingForm.titleNew") }} />
         <Stack.Screen name="owner/listing/[id]" options={{ title: t("manage.title") }} />
         <Stack.Screen name="owner/listing-edit/[id]" options={{ title: t("listingForm.titleEdit") }} />

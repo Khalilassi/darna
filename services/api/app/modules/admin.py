@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core import mfa_enrollment
 from app.core.audit import audit
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, require
@@ -45,7 +46,7 @@ from app.models.enums import (
 from app.modules import listings as L
 from app.modules import properties as P
 from app.modules.deals import expire_all_offers
-from app.modules.verification import VERIFICATION_FSM
+from app.modules.verification import VERIFICATION_FSM, sale_terms_hash
 from app.schemas.common import ORM, Ok, Page
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -62,6 +63,12 @@ class AdminUserOut(ORM):
     identity_verified_at: datetime | None
     suspended_reason: str | None
     created_at: datetime
+    mfa_enabled_at: datetime | None = None
+
+
+class EnrollmentCodeOut(BaseModel):
+    code: str
+    expires_at: datetime
 
 
 class UserUpdate(BaseModel):
@@ -98,11 +105,31 @@ def update_user(user_id: uuid.UUID, body: UserUpdate, request: Request, admin: U
         u.is_active = body.is_active
         u.suspended_reason = body.suspended_reason if not body.is_active else None
         if not body.is_active:
-            for listing in db.scalars(select(Listing).where(Listing.owner_id == u.id, Listing.status.in_([ListingStatus.active, ListingStatus.paused]))):
+            # Everything public (including homes under offer) leaves the marketplace; pending listings are
+            # held because approval requires an active owner.
+            suspendable = [ListingStatus.active, ListingStatus.paused, ListingStatus.under_offer]
+            for listing in db.scalars(select(Listing).where(Listing.owner_id == u.id, Listing.status.in_(suspendable))):
                 L.transition(db, listing, ListingStatus.suspended, admin, client_ip(request), note="Owner account suspended")
     audit(db, "user.updated", "user", u.id, actor_id=admin.id, data=body.model_dump(exclude_none=True, mode="json"), ip=client_ip(request))
     db.commit()
     return u
+
+
+@router.post("/users/{user_id}/mfa-enrollment-code", response_model=EnrollmentCodeOut)
+def issue_mfa_enrollment_code(user_id: uuid.UUID, request: Request, admin: User = Depends(require("user.manage")),
+                              db: Session = Depends(get_db)):
+    """One-time code a staff member needs to enrol MFA (shown once; give it to them out of band)."""
+    u = db.get(User, user_id, with_for_update=True)
+    if u is None:
+        raise NotFound("User not found")
+    if u.role == Role.member:
+        raise Conflict("Enrolment codes are for staff accounts", code="not_staff")
+    if u.mfa_enabled_at is not None:
+        raise Conflict("Two-factor authentication is already enabled", code="mfa_already_enabled")
+    code, expires = mfa_enrollment.issue(u)
+    audit(db, "user.mfa_enrollment_code_issued", "user", u.id, actor_id=admin.id, ip=client_ip(request))
+    db.commit()
+    return EnrollmentCodeOut(code=code, expires_at=expires)
 
 
 # --------------------------------------------------------------------------- verification queue
@@ -144,27 +171,37 @@ class DecisionIn(BaseModel):
     supersede_existing: bool = False
 
 
-@router.get("/verifications", response_model=list[QueueItem])
+@router.get("/verifications", response_model=Page[QueueItem])
 def verification_queue(status: list[VS] = Query(default=[VS.submitted, VS.under_review]), kind: VerificationKind | None = None,
+                       page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
                        _: User = Depends(require("verification.review")), db: Session = Depends(get_db)):
-    stmt = select(VerificationRequest).options(joinedload(VerificationRequest.user)).where(VerificationRequest.status.in_(status))
+    """Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries."""
+    stmt = select(VerificationRequest).where(VerificationRequest.status.in_(status))
     if kind:
         stmt = stmt.where(VerificationRequest.kind == kind)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.options(joinedload(VerificationRequest.user))
+                      .order_by(VerificationRequest.created_at, VerificationRequest.id)
+                      .offset((page - 1) * page_size).limit(page_size)).all()
+    doc_ids = {uuid.UUID(d) for vr in rows for d in vr.document_ids}
+    docs = {d.id: d for d in db.scalars(select(Document).where(Document.id.in_(doc_ids)))} if doc_ids else {}
+    claim_ids = {vr.claim_id for vr in rows if vr.claim_id}
+    claims = ({c.id: c for c in db.scalars(select(OwnershipClaim).options(joinedload(OwnershipClaim.property))
+                                            .where(OwnershipClaim.id.in_(claim_ids)))} if claim_ids else {})
     out = []
-    for vr in db.scalars(stmt.order_by(VerificationRequest.created_at)).all():
-        docs = db.scalars(select(Document).where(Document.id.in_([uuid.UUID(d) for d in vr.document_ids]))).all()
+    for vr in rows:
         claim = None
-        if vr.claim_id:
-            c = db.scalar(select(OwnershipClaim).options(joinedload(OwnershipClaim.property)).where(OwnershipClaim.id == vr.claim_id))
-            if c:
-                p = c.property
-                claim = QueueClaim(status=c.status, capacity=c.capacity.value, principal_name=c.principal_name,
-                                   authority_scope=c.authority_scope, property_id=p.id, identity_key=p.identity_key,
-                                   property_type=p.property_type.value, area_sqm=str(p.area_sqm))
+        c = claims.get(vr.claim_id) if vr.claim_id else None
+        if c:
+            p = c.property
+            claim = QueueClaim(status=c.status, capacity=c.capacity.value, principal_name=c.principal_name,
+                               authority_scope=c.authority_scope, property_id=p.id, identity_key=p.identity_key,
+                               property_type=p.property_type.value, area_sqm=str(p.area_sqm))
+        vr_docs = [docs[uuid.UUID(d)] for d in vr.document_ids if uuid.UUID(d) in docs]
         out.append(QueueItem(id=vr.id, kind=vr.kind, status=vr.status, user_id=vr.user_id, user_name=vr.user.full_name,
                              claim_id=vr.claim_id, listing_id=vr.listing_id, note=vr.note,
-                             documents=[DocRef.model_validate(d) for d in docs], claim=claim, created_at=vr.created_at))
-    return out
+                             documents=[DocRef.model_validate(d) for d in vr_docs], claim=claim, created_at=vr.created_at))
+    return Page(items=out, total=total, page=page, page_size=page_size)
 
 
 @router.post("/verifications/{vr_id}/decision", response_model=Ok)
@@ -200,6 +237,12 @@ def decide(vr_id: uuid.UUID, body: DecisionIn, request: Request, reviewer: User 
     else:
         target = VS.approved if body.decision == "approve" else VS.rejected
         VERIFICATION_FSM.assert_transition(vr.status, target)
+        if vr.kind == VerificationKind.financial and target == VS.approved and vr.listing_id:
+            listing = db.get(Listing, vr.listing_id, with_for_update=True)
+            # Requests created before terms_hash existed (NULL) keep the previous behaviour.
+            if listing is None or (vr.terms_hash is not None and sale_terms_hash(listing.sale_terms) != vr.terms_hash):
+                raise Conflict("The owner changed the figures after submitting them; ask them to submit again",
+                               code="terms_changed_since_submission")
         vr.status = target
         vr.reviewer_id = reviewer.id
         vr.decision_note = body.note
@@ -289,7 +332,9 @@ def moderate(listing_id: uuid.UUID, body: ModerateIn, request: Request, staff: U
     if body.action == "approve":
         owner = db.get(User, listing.owner_id)
         claim = db.get(OwnershipClaim, listing.claim_id)
-        if owner is None or owner.identity_verified_at is None or claim is None or claim.status != ClaimStatus.approved:
+        if owner is None or not owner.is_active:
+            raise Conflict("The owner's account is suspended", code="owner_suspended")
+        if owner.identity_verified_at is None or claim is None or claim.status != ClaimStatus.approved:
             raise Conflict("Owner identity and ownership must be verified first", code="owner_not_verified")
         L.transition(db, listing, ListingStatus.active, staff, ip, note=body.note)
         listing.approved_version = listing.version

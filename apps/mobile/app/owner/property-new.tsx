@@ -13,7 +13,7 @@ import { useLanguage } from "../../src/i18n/LanguageProvider";
 import { DELIVERY, enumOptions, FINISHINGS, ORIENTATIONS, PROPERTY_TYPES, UNIT_REQUIRED } from "../../src/lib/enums";
 import { validateInt } from "../../src/lib/validation";
 
-type Identity = Schemas["IdentityIn"];
+type Identity = Pick<Schemas["PropertyIn"], "project_id" | "district_id" | "property_type" | "group_code" | "building_code" | "unit_code">;
 
 export default function RegisterProperty() {
   return (
@@ -31,7 +31,6 @@ function Flow() {
   const projects = useProjects();
   const [id, setId] = useState<Partial<Identity>>({ property_type: "apartment" });
   const [idErrors, setIdErrors] = useState<Record<string, string | undefined>>({});
-  const [check, setCheck] = useState<Schemas["IdentityCheckOut"] | null>(null);
   const [specs, setSpecs] = useState({ floor: "", area: "", garden: "", bedrooms: "", bathrooms: "" });
   const [finishing, setFinishing] = useState<Schemas["Finishing"]>("fully_finished");
   const [delivery, setDelivery] = useState<Schemas["DeliveryStatus"]>("ready");
@@ -44,15 +43,7 @@ function Flow() {
 
   const project = projects.data?.find((p) => p.id === id.project_id);
   const unitNeeded = id.property_type ? UNIT_REQUIRED.includes(id.property_type) : true;
-  const setField = (k: keyof Identity, v: string | undefined) => {
-    setCheck(null);
-    setId((x) => ({ ...x, [k]: v }));
-  };
-
-  const checkM = useMutation({
-    mutationFn: async (body: Identity) => unwrap(await api.POST("/properties/identity-check", { body })),
-    onSuccess: setCheck,
-  });
+  const setField = (k: keyof Identity, v: string | undefined) => setId((x) => ({ ...x, [k]: v }));
   const register = useMutation({
     mutationFn: async (claim: Schemas["ClaimIn"]) => {
       const property: Schemas["PropertyIn"] = {
@@ -71,16 +62,12 @@ function Flow() {
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.myProperties }),
     onError: (e) => {
-      if (errorCode(e) === "property_exists") {
-        const pid = (e as { details?: { property_id?: string } }).details?.property_id ?? null;
-        setCheck({ exists: true, property_id: pid, has_live_listing: false });
-      }
       const fe = fieldErrors(e);
       setSpecErrors((s) => ({ ...s, ...Object.fromEntries(Object.entries(fe).map(([k, v]) => [k.replace(/^property\./, ""), v])) }));
     },
   });
 
-  const runCheck = () => {
+  const identityValid = () => {
     const e = {
       district_id: id.district_id ? undefined : t("validation.choose"),
       group_code: id.group_code?.trim() ? undefined : t("validation.required"),
@@ -88,8 +75,7 @@ function Flow() {
       unit_code: unitNeeded && !id.unit_code?.trim() ? t("validation.required") : undefined,
     };
     setIdErrors(e);
-    if (Object.values(e).some(Boolean)) return;
-    checkM.mutate({ ...(id as Identity), unit_code: unitNeeded ? id.unit_code : null });
+    return !Object.values(e).some(Boolean);
   };
 
   const specsValid = () => {
@@ -107,7 +93,7 @@ function Flow() {
   if (register.isSuccess)
     return (
       <Screen>
-        <Notice tone="success">{t("property.registered")}</Notice>
+        <Notice tone="success">{register.data.claimed_existing ? t("property.claimedExisting") : t("property.registered")}</Notice>
         <Button title={t("common.done")} onPress={() => router.replace("/owner")} />
       </Screen>
     );
@@ -138,24 +124,11 @@ function Flow() {
             {unitNeeded ? (
               <TextField label={t("property.unit")} value={id.unit_code ?? ""} onChangeText={(v) => setField("unit_code", v)} autoCapitalize="characters" error={idErrors.unit_code} testID="pn-unit" />
             ) : null}
-            {checkM.isError ? <Notice tone="danger">{errorMessage(checkM.error, t)}</Notice> : null}
-            {!check ? <Button title={t("property.check")} onPress={runCheck} loading={checkM.isPending} testID="pn-check" /> : null}
           </Section>
         )}
       </QueryView>
 
-      {check?.exists ? (
-        <Card testID="pn-exists">
-          <T variant="heading">{t("property.exists")}</T>
-          <T tone="muted">{t("property.existsBody")}</T>
-          {check.has_live_listing ? <Notice tone="warning">{t("property.existsLive")}</Notice> : null}
-          {check.property_id ? <Button title={t("property.claimIt")} onPress={() => router.push(`/owner/claim/${check.property_id}`)} /> : null}
-        </Card>
-      ) : null}
-
-      {check && !check.exists ? (
-        <>
-          <Notice tone="success">{t("property.notExists")}</Notice>
+      <>
           <Section title={t("property.specsStep")}>
             <Row gap={8} style={{ alignItems: "flex-start" }}>
               <TextField containerStyle={{ flex: 1 }} label={t("property.area")} value={specs.area} onChangeText={(v) => setSpecs({ ...specs, area: v })} keyboardType="decimal-pad" error={specErrors.area_sqm} />
@@ -173,13 +146,15 @@ function Flow() {
           <Section title={t("property.claimStep")}>
             <ClaimForm
               submitLabel={t("property.submit")}
-              onSubmit={(c) => specsValid() && register.mutate(c)}
+              onSubmit={(c) => {
+                const okId = identityValid();
+                if (specsValid() && okId) register.mutate(c);
+              }}
               busy={register.isPending}
-              error={register.isError && errorCode(register.error) !== "property_exists" ? errorMessage(register.error, t) : null}
+              error={register.isError ? errorMessage(register.error, t) : null}
             />
           </Section>
-        </>
-      ) : null}
+      </>
     </Screen>
   );
 }

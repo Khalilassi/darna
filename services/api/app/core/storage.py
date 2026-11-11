@@ -53,10 +53,16 @@ def _check_key(key: str) -> str:
     return key
 
 
+# A small compressed file can declare a huge canvas ("decompression bomb"); refuse before decoding.
+MAX_IMAGE_PIXELS = 40_000_000  # ~ 8000 x 5000, well above any phone camera
+
+
 def process_image(data: bytes, max_side: int = 2048) -> tuple[bytes, int, int]:
     """Validate and re-encode an uploaded photo. Returns (jpeg_bytes, width, height)."""
     try:
-        img = Image.open(io.BytesIO(data))
+        img = Image.open(io.BytesIO(data))  # lazy: reads the header only
+        if img.width * img.height > MAX_IMAGE_PIXELS:
+            raise ValidationFailed("Image dimensions are too large", code="image_too_large")
         img.verify()
         img = Image.open(io.BytesIO(data))
     except (UnidentifiedImageError, OSError) as exc:

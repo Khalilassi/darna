@@ -6,20 +6,22 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import Response
-from sqlalchemy import exists, select
+from sqlalchemy import cast, exists, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
-from app.core.deps import PERMISSIONS, client_ip, current_user
+from app.core.deps import client_ip, current_user, has_permission
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.scanning import ensure_clean
 from app.core.security import sha256_hex, sign_document_access, verify_document_access
 from app.core.storage import ALLOWED_DOC_TYPES, private_storage, sniff_type
-from app.models.entities import ChecklistItem, Deal, Document, User
-from app.models.enums import DocumentKind
+from app.models.entities import ChecklistItem, Deal, Document, User, VerificationRequest
+from app.models.enums import DealStatus, DocumentKind
+from app.models.enums import VerificationStatus as VS
 from app.schemas.common import ORM, Ok
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -44,15 +46,17 @@ def can_access_document(db: Session, user: User, doc: Document) -> bool:
         return False
     if doc.owner_id == user.id:
         return True
-    if user.role in PERMISSIONS["document.review"]:
+    if has_permission(user, "document.review"):
         return True
-    # Counterparty in a deal where this document was attached to the checklist.
+    # Counterparty in a live or completed deal where this document was attached to the checklist.
+    # A cancelled deal ends the counterparty's access.
     return bool(
         db.scalar(
             select(
                 exists().where(
                     ChecklistItem.document_id == doc.id,
                     ChecklistItem.deal_id == Deal.id,
+                    Deal.status != DealStatus.cancelled,
                     (Deal.buyer_id == user.id) | (Deal.owner_id == user.id),
                 )
             )
@@ -61,7 +65,10 @@ def can_access_document(db: Session, user: User, doc: Document) -> bool:
 
 
 def get_owned_documents(db: Session, user: User, ids: list[uuid.UUID]) -> list[Document]:
-    docs = db.scalars(select(Document).where(Document.id.in_(ids), Document.deleted_at.is_(None))).all() if ids else []
+    """Validate and lock (until commit) documents a request is about to reference, so a concurrent delete
+    cannot remove them in between. Rows are locked in id order, like delete_document, to avoid deadlocks."""
+    docs = db.scalars(select(Document).where(Document.id.in_(ids)).order_by(Document.id).with_for_update()).all() if ids else []
+    docs = [d for d in docs if d.deleted_at is None]
     if len(docs) != len(set(ids)) or any(d.owner_id != user.id for d in docs):
         raise ValidationFailed("Unknown document reference", code="invalid_document_reference")
     return list(docs)
@@ -112,14 +119,16 @@ def signed_url(document_id: uuid.UUID, user: User = Depends(current_user), db: S
     doc = db.get(Document, document_id)
     if doc is None or not can_access_document(db, user, doc):
         raise NotFound("Document not found")
-    token, exp = sign_document_access(doc.id, user.id)
+    token, exp = sign_document_access(doc.id, user.id, mfa=user.session_mfa)
     return {"url": f"{get_settings().public_base_url}/documents/{doc.id}/content?token={token}", "expires_at": exp}
 
 
 @router.get("/{document_id}/content")
 def content(document_id: uuid.UUID, request: Request, token: str = Query(max_length=300), db: Session = Depends(get_db)):
-    uid = verify_document_access(document_id, token)
+    uid, mfa = verify_document_access(document_id, token)
     user = db.get(User, uid)
+    if user is not None:
+        user.session_mfa = mfa
     doc = db.get(Document, document_id)
     # Re-check authorization at read time: access may have been revoked since the URL was issued.
     if user is None or not user.is_active or doc is None or not can_access_document(db, user, doc):
@@ -140,14 +149,25 @@ def content(document_id: uuid.UUID, request: Request, token: str = Query(max_len
 
 @router.delete("/{document_id}", response_model=Ok)
 def delete_document(document_id: uuid.UUID, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    doc = db.get(Document, document_id)
+    # Row lock: a concurrent request referencing this document (verification, claim, checklist) either
+    # commits first, and the checks below see it, or waits and then finds the document deleted.
+    doc = db.get(Document, document_id, with_for_update=True)
     if doc is None or doc.owner_id != user.id or doc.deleted_at:
         raise NotFound("Document not found")
-    in_use = db.scalar(select(exists().where(ChecklistItem.document_id == doc.id)))
+    in_use = db.scalar(select(exists().where(
+        ChecklistItem.document_id == doc.id, ChecklistItem.deal_id == Deal.id, Deal.status != DealStatus.cancelled)))
     if in_use:
         raise Forbidden("Document is attached to a transaction record and is retained", code="document_retained")
+    # Evidence for a pending or approved verification (identity, ownership, financials) is kept.
+    evidence = db.scalar(select(exists().where(
+        VerificationRequest.status.in_([VS.submitted, VS.under_review, VS.more_info_required, VS.approved]),
+        cast(VerificationRequest.document_ids, JSONB).contains([str(doc.id)]),
+    )))
+    if evidence:
+        raise Forbidden("Document is evidence for a verification and is retained", code="document_in_verification")
     doc.deleted_at = utcnow()
-    private_storage().delete(doc.storage_key)
     audit(db, "document.deleted", "document", doc.id, actor_id=user.id, ip=client_ip(request))
     db.commit()
+    # Remove the bytes only once the deletion is committed (the worker purge also skips deleted rows).
+    private_storage().delete(doc.storage_key)
     return Ok()

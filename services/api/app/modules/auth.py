@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.core import rate_limit, totp
+from app.core import mfa_enrollment, rate_limit, totp
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
@@ -95,12 +95,12 @@ class MeUpdate(BaseModel):
     locale: str | None = Field(default=None, pattern="^(en|ar)$")
 
 
-def _issue_tokens(db: Session, user: User) -> TokenOut:
+def _issue_tokens(db: Session, user: User, mfa: bool = False) -> TokenOut:
     s = get_settings()
     raw, digest = new_refresh_token()
-    db.add(RefreshToken(user_id=user.id, token_hash=digest, expires_at=utcnow() + timedelta(days=s.refresh_token_days)))
+    db.add(RefreshToken(user_id=user.id, token_hash=digest, expires_at=utcnow() + timedelta(days=s.refresh_token_days), mfa=mfa))
     return TokenOut(
-        access_token=create_access_token(user.id, user.role.value),
+        access_token=create_access_token(user.id, user.role.value, mfa=mfa),
         refresh_token=raw,
         expires_in=s.access_token_minutes * 60,
     )
@@ -187,7 +187,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> Tok
             raise Unauthorized("Invalid two-factor code", code="mfa_invalid")
         user.totp_last_counter = counter
     db.delete(throttle)  # successful sign-in resets the counter
-    out = _issue_tokens(db, user)
+    out = _issue_tokens(db, user, mfa=user.mfa_enabled_at is not None)
     db.commit()
     return out
 
@@ -207,7 +207,8 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)) -> TokenOut:
     if user is None or not user.is_active:
         raise Unauthorized("Account unavailable", code="account_unavailable")
     rt.revoked_at = utcnow()
-    out = _issue_tokens(db, user)
+    # A session keeps its MFA status only while the account still has MFA on.
+    out = _issue_tokens(db, user, mfa=rt.mfa and user.mfa_enabled_at is not None)
     db.commit()
     return out
 
@@ -269,11 +270,29 @@ class MfaDisableIn(MfaCodeIn):
     password: str = Field(max_length=128)
 
 
+class MfaSetupIn(BaseModel):
+    password: str = Field(max_length=128)
+    # Required for staff accounts while the staff-MFA policy is on (issued by an admin).
+    enrollment_code: str | None = Field(default=None, max_length=32)
+
+
 @router.post("/mfa/setup", response_model=MfaSetupOut, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
-def mfa_setup(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm."""
+def mfa_setup(body: MfaSetupIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.
+
+    Re-checks the password so a stolen access token alone cannot bind an attacker's authenticator.
+    """
     if user.mfa_enabled_at:
         raise Conflict("Two-factor authentication is already enabled", code="mfa_already_enabled")
+    if not verify_password(body.password, user.password_hash):
+        audit(db, "user.mfa_setup_bad_password", "user", user.id, actor_id=user.id, ip=client_ip(request))
+        db.commit()
+        raise Unauthorized("Invalid password", code="invalid_credentials")
+    if get_settings().require_staff_mfa and user.role != Role.member and not mfa_enrollment.check(user, body.enrollment_code):
+        # The password alone must not let someone bind their own authenticator to a staff account.
+        audit(db, "user.mfa_setup_bad_enrollment_code", "user", user.id, actor_id=user.id, ip=client_ip(request))
+        db.commit()
+        raise Forbidden("Ask an administrator for a two-factor setup code", code="mfa_enrollment_code_required")
     secret = totp.new_secret()
     user.totp_secret_encrypted = totp.encrypt_secret(secret)
     user.totp_last_counter = None
@@ -282,7 +301,7 @@ def mfa_setup(request: Request, user: User = Depends(current_user), db: Session 
     return MfaSetupOut(secret=secret, otpauth_uri=totp.provisioning_uri(secret, user.email))
 
 
-@router.post("/mfa/confirm", response_model=Ok, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
+@router.post("/mfa/confirm", response_model=TokenOut, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
 def mfa_confirm(body: MfaCodeIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.mfa_enabled_at or not user.totp_secret_encrypted:
         raise Conflict("Start setup first", code="mfa_not_pending")
@@ -291,9 +310,14 @@ def mfa_confirm(body: MfaCodeIn, request: Request, user: User = Depends(current_
         raise ValidationFailed("Invalid code", code="mfa_invalid")
     user.totp_last_counter = counter
     user.mfa_enabled_at = utcnow()
+    mfa_enrollment.clear(user)  # one-time
+    # Sessions opened before MFA (possibly by someone else) end; this one continues with fresh MFA tokens.
+    for t in db.scalars(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))):
+        t.revoked_at = utcnow()
     audit(db, "user.mfa_enabled", "user", user.id, actor_id=user.id, ip=client_ip(request))
+    out = _issue_tokens(db, user, mfa=True)
     db.commit()
-    return Ok()
+    return out
 
 
 @router.post("/mfa/disable", response_model=Ok, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
