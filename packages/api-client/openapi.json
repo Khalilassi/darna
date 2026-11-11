@@ -5366,6 +5366,11 @@
    },
    "SentOut": {
     "properties": {
+     "conversation_id": {
+      "format": "uuid",
+      "title": "Conversation Id",
+      "type": "string"
+     },
      "message": {
       "$ref": "#/components/schemas/MessageOut"
      },
@@ -5382,6 +5387,7 @@
      }
     },
     "required": [
+     "conversation_id",
      "message"
     ],
     "title": "SentOut",

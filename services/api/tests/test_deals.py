@@ -235,6 +235,7 @@ def test_messaging_and_viewings(make_user, project, reviewer, db):
     r = buyer.post("/conversations", json={"listing_id": lid, "message": "Is it available? call 01012345678"}).json()
     assert r["safety_tip"] == "keep_payments_off_chat"
     conv = buyer.get("/conversations").json()[0]
+    assert r["conversation_id"] == conv["id"]
     assert owner.get("/conversations").json()[0]["unread"] == 1
     assert outsider.get(f"/conversations/{conv['id']}/messages").status_code == 404
     owner.post(f"/conversations/{conv['id']}/messages", json={"body": "Yes, it is."})

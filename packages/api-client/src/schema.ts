@@ -2902,6 +2902,11 @@ export interface components {
         };
         /** SentOut */
         SentOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
             message: components["schemas"]["MessageOut"];
             /** Safety Tip */
             safety_tip?: string | null;

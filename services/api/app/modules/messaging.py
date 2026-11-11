@@ -52,6 +52,7 @@ class ConversationOut(BaseModel):
 
 
 class SentOut(BaseModel):
+    conversation_id: uuid.UUID
     message: MessageOut
     safety_tip: str | None = None
 
@@ -72,7 +73,7 @@ def _send(db: Session, conv: Conversation, user: User, body: str) -> SentOut:
     notify(db, other, "new_message", conversation_id=conv.id)
     db.flush()
     tip = "keep_payments_off_chat" if contains_contact_details(body) else None
-    return SentOut(message=MessageOut.model_validate(msg), safety_tip=tip)
+    return SentOut(conversation_id=conv.id, message=MessageOut.model_validate(msg), safety_tip=tip)
 
 
 @router.post("", response_model=SentOut, status_code=201, dependencies=[Depends(rate_limit.limit("conv_start", 30, 3600))])
