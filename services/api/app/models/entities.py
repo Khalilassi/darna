@@ -311,6 +311,15 @@ class ListingPhoto(IdMixin, Base):
     listing: Mapped[Listing] = relationship(back_populates="photos")
 
 
+class ListingDailyView(Base):
+    """Public detail-page views per listing per UTC day (owners' own views are not counted)."""
+
+    __tablename__ = "listing_daily_views"
+    listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    views: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class Favorite(Base):
     __tablename__ = "favorites"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)

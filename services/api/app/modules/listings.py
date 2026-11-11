@@ -9,6 +9,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -39,6 +40,7 @@ from app.models.entities import (
     Deal,
     Favorite,
     Listing,
+    ListingDailyView,
     ListingPhoto,
     Offer,
     Property,
@@ -676,6 +678,9 @@ def detail(listing_id: uuid.UUID, user: User | None = Depends(current_user_optio
         raise NotFound("Listing not found")
     if not is_owner:
         db.execute(update(Listing).where(Listing.id == listing.id).values(view_count=Listing.view_count + 1))
+        stmt = pg_insert(ListingDailyView).values(listing_id=listing.id, day=utcnow().date(), views=1)
+        db.execute(stmt.on_conflict_do_update(index_elements=["listing_id", "day"],
+                                              set_={"views": ListingDailyView.views + 1}))
         db.commit()
     return ListingDetail(**_detail(db, listing, user))
 

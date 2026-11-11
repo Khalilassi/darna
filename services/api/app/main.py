@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import logging
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.core import logging_filters
+from app.core import logging_filters, observability
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import install_error_handlers
@@ -21,6 +19,7 @@ from app.modules import (
     market,
     messaging,
     notifications,
+    performance,
     phone,
     properties,
     saved_searches,
@@ -28,8 +27,6 @@ from app.modules import (
     verification,
     viewings,
 )
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 def create_app() -> FastAPI:
@@ -43,6 +40,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     install_error_handlers(app)
+    observability.configure_logging()
     logging_filters.install()  # signed document tokens must never land in access logs
     app.add_middleware(
         CORSMiddleware,
@@ -62,7 +60,9 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
-    for r in (auth, phone, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
+    observability.install(app)  # request ids + metrics; registered last so it wraps everything
+
+    for r in (auth, phone, catalog, documents, verification, properties, market, performance, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
 
     if settings.storage_backend == "local":  # with s3, photos are served by the CDN / bucket

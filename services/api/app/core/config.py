@@ -48,6 +48,8 @@ class Settings(BaseSettings):
         "http://localhost:8081",
         "http://localhost:19006",
     ]
+    log_format: str = "text"  # text | json
+    metrics_token: str | None = None  # enables GET /metrics when set
     rate_limit_enabled: bool = True
     rate_limit_backend: str = "memory"  # memory | redis
     redis_url: str = "redis://localhost:6379/0"
