@@ -17,3 +17,5 @@ services/api/storage/
 *.log
 .DS_Store
 services/api/storage/
+*.tsbuildinfo
+next-env.d.ts
