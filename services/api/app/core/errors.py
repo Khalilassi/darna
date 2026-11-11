@@ -65,7 +65,10 @@ class RateLimited(AppError):
 
 
 def _body(code: str, message: str, details: Any = None) -> dict:
-    return {"error": {"code": code, "message": message, "details": details}}
+    from app.core.observability import current_request_id
+
+    # request_id lets support find the matching server log line when a user reports an error.
+    return {"error": {"code": code, "message": message, "details": details, "request_id": current_request_id()}}
 
 
 def install_error_handlers(app: FastAPI) -> None:

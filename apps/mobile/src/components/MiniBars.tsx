@@ -16,20 +16,28 @@ export interface Bar {
   highlight?: boolean;
 }
 
-/** Simple vertical bar chart built from Views (no chart dependency). Follows the layout direction. */
-export function MiniBars({ bars, height = 120, testID }: { bars: Bar[]; height?: number; testID?: string }) {
+/**
+ * Simple vertical bar chart built from Views (no chart dependency). Follows the layout direction.
+ * Options for dense series: `gap` between bars, `showValues=false` hides the text above bars, and
+ * `flatZero` draws a 0 as a flat baseline instead of the minimum visible bar. Empty labels are omitted.
+ */
+export function MiniBars({
+  bars, height = 120, testID, gap = 8, showValues = true, flatZero = false,
+}: { bars: Bar[]; height?: number; testID?: string; gap?: number; showValues?: boolean; flatZero?: boolean }) {
   const { colors, radii } = useTheme();
   const fractions = barFractions(bars.map((b) => b.value));
   return (
-    <View style={styles.row} testID={testID}>
+    <View style={[styles.row, { gap }]} testID={testID}>
       {bars.map((b, i) => {
         const f = fractions[i];
         return (
           <View key={b.key} style={styles.col} accessible accessibilityLabel={b.accessibilityLabel} testID={testID ? `${testID}-${b.key}` : undefined}>
-            <T variant="caption" tone={f === null ? "muted" : "default"} numberOfLines={1} style={styles.value}>{b.valueLabel}</T>
+            {showValues ? <T variant="caption" tone={f === null ? "muted" : "default"} numberOfLines={1} style={styles.value}>{b.valueLabel}</T> : null}
             <View style={[styles.track, { height }]}>
               {f === null ? (
                 <View style={[styles.empty, { height: height * 0.3, borderColor: colors.border, borderRadius: radii.sm }]} />
+              ) : flatZero && b.value === 0 ? (
+                <View style={{ height: 2, backgroundColor: colors.border }} />
               ) : (
                 <View
                   style={{
@@ -42,7 +50,7 @@ export function MiniBars({ bars, height = 120, testID }: { bars: Bar[]; height?:
               )}
             </View>
             <View style={[styles.axis, { backgroundColor: colors.border }]} />
-            <T variant="caption" tone="muted" numberOfLines={1} style={styles.value}>{b.label}</T>
+            {b.label ? <T variant="caption" tone="muted" numberOfLines={1} style={styles.value}>{b.label}</T> : null}
           </View>
         );
       })}
@@ -51,7 +59,7 @@ export function MiniBars({ bars, height = 120, testID }: { bars: Bar[]; height?:
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  row: { flexDirection: "row", alignItems: "flex-end" },
   col: { flex: 1, maxWidth: 96, gap: 4 },
   track: { justifyContent: "flex-end" },
   empty: { borderWidth: 1, borderStyle: "dashed" },

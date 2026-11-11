@@ -38,7 +38,8 @@ def test_login_failures_are_uniform(client):
     a = client.post("/auth/login", json={"email": "e@example.com", "password": "wrong-pass-123"})
     b = client.post("/auth/login", json={"email": "nobody@example.com", "password": "wrong-pass-123"})
     assert a.status_code == b.status_code == 401
-    assert a.json() == b.json()
+    strip = lambda r: {k: v for k, v in r.json()["error"].items() if k != "request_id"}  # noqa: E731 - ids differ per request
+    assert strip(a) == strip(b)
 
 
 def test_protected_endpoints_require_auth(client):

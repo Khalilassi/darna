@@ -67,8 +67,10 @@ def get_owned_documents(db: Session, user: User, ids: list[uuid.UUID]) -> list[D
     return list(docs)
 
 
+# Synchronous on purpose: FastAPI runs it in the worker threadpool, so the database work, the malware scan
+# and (S3) storage never block the event loop.
 @router.post("", response_model=DocumentOut, status_code=201, dependencies=[Depends(rate_limit.limit("upload", 60, 3600))])
-async def upload(
+def upload(
     request: Request,
     kind: DocumentKind = Form(...),
     file: UploadFile = File(...),
@@ -76,7 +78,7 @@ async def upload(
     db: Session = Depends(get_db),
 ) -> Document:
     s = get_settings()
-    data = await file.read(s.max_upload_bytes + 1)
+    data = file.file.read(s.max_upload_bytes + 1)
     if len(data) > s.max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
     if not data:

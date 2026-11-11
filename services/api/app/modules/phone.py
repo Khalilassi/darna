@@ -77,6 +77,8 @@ def start(body: StartIn, request: Request, user: User = Depends(current_user), d
     taken = db.scalar(select(User.id).where(User.phone == body.phone, User.phone_verified_at.is_not(None), User.id != user.id))
     if taken:
         raise Conflict("This number is verified on another account", code="phone_in_use")
+    # Serialize sends per user so concurrent requests cannot bypass the cooldown or hourly limit.
+    db.execute(select(User.id).where(User.id == user.id).with_for_update())
     now = utcnow()
     recent = db.scalars(select(PhoneVerification).where(PhoneVerification.user_id == user.id,
                                                         PhoneVerification.created_at > now - timedelta(hours=1))
@@ -98,9 +100,10 @@ def start(body: StartIn, request: Request, user: User = Depends(current_user), d
 
 @router.post("/verify", response_model=Ok, dependencies=[Depends(rate_limit.limit("phone_verify", 30, 3600))])
 def verify(body: VerifyIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    pv = db.scalar(select(PhoneVerification).where(PhoneVerification.user_id == user.id, PhoneVerification.verified_at.is_(None))
+    # Only the most recent challenge is valid: a newer code supersedes older ones even after it is used.
+    pv = db.scalar(select(PhoneVerification).where(PhoneVerification.user_id == user.id)
                    .order_by(PhoneVerification.created_at.desc()).limit(1).with_for_update())
-    if pv is None or pv.expires_at < utcnow():
+    if pv is None or pv.verified_at is not None or pv.expires_at < utcnow():
         raise ValidationFailed("The code has expired. Request a new one.", code="code_expired")
     if pv.attempts >= MAX_ATTEMPTS:
         raise ValidationFailed("Too many wrong codes. Request a new one.", code="code_attempts_exceeded")

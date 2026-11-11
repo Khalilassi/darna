@@ -235,7 +235,7 @@ function ListingView({ l, refetch }: { l: Detail; refetch: () => void }) {
               size="sm"
               icon="bar-chart-outline"
               onPress={() =>
-                router.push(`/market?purpose=${isSale ? "sale" : "rent"}&district=${encodeURIComponent(l.district_id)}&property_type=${l.property_type}`)
+                router.push(`/market?purpose=${isSale ? "sale" : "rent"}&project=${encodeURIComponent(l.project_id)}&district=${encodeURIComponent(l.district_id)}&property_type=${l.property_type}`)
               }
               testID="compare-district"
             />

@@ -9,6 +9,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -39,7 +40,9 @@ from app.models.entities import (
     Deal,
     Favorite,
     Listing,
+    ListingDailyView,
     ListingPhoto,
+    ListingPublication,
     Offer,
     Property,
     User,
@@ -344,6 +347,8 @@ def transition(db: Session, listing: Listing, target: LS, actor: User | None, ip
     listing.status = target
     if target == LS.active and listing.published_at is None:
         listing.published_at = utcnow()
+        # Outbox row in the same transaction: saved-search alerts see it only once this commits.
+        db.add(ListingPublication(listing_id=listing.id))
     if target in (LS.active, LS.sold, LS.rented):
         from app.modules.market import record_price_event
 
@@ -468,15 +473,17 @@ def listing_action(listing_id: uuid.UUID, body: ActionIn, request: Request, user
     return _owner_out(db, _load(db, listing.id), user)
 
 
+# Synchronous on purpose: the whole handler (row lock, scan, re-encode, storage, commit) runs in the worker
+# threadpool. Awaiting inside an async handler while holding a row lock could deadlock the event loop.
 @router.post("/{listing_id}/photos", response_model=PhotoOut, status_code=201, dependencies=[Depends(rate_limit.limit("photo", 120, 3600))])
-async def upload_photo(listing_id: uuid.UUID, file: UploadFile = File(...), user: User = Depends(current_user), db: Session = Depends(get_db)):
+def upload_photo(listing_id: uuid.UUID, file: UploadFile = File(...), user: User = Depends(current_user), db: Session = Depends(get_db)):
     listing = _owned(db, user, listing_id)
     if listing.status not in EDITABLE:
         raise Conflict("Pause the listing before editing photos", code="listing_not_editable")
     count = db.scalar(select(func.count()).select_from(ListingPhoto).where(ListingPhoto.listing_id == listing.id)) or 0
     if count >= MAX_PHOTOS:
         raise ValidationFailed(f"Maximum {MAX_PHOTOS} photos", code="too_many_photos")
-    data = await file.read(get_settings().max_upload_bytes + 1)
+    data = file.file.read(get_settings().max_upload_bytes + 1)
     if len(data) > get_settings().max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
     ensure_clean(data)
@@ -676,6 +683,9 @@ def detail(listing_id: uuid.UUID, user: User | None = Depends(current_user_optio
         raise NotFound("Listing not found")
     if not is_owner:
         db.execute(update(Listing).where(Listing.id == listing.id).values(view_count=Listing.view_count + 1))
+        stmt = pg_insert(ListingDailyView).values(listing_id=listing.id, day=utcnow().date(), views=1)
+        db.execute(stmt.on_conflict_do_update(index_elements=["listing_id", "day"],
+                                              set_={"views": ListingDailyView.views + 1}))
         db.commit()
     return ListingDetail(**_detail(db, listing, user))
 
@@ -704,6 +714,9 @@ def add_favorite(listing_id: uuid.UUID, user: User = Depends(current_user), db: 
         raise NotFound("Listing not found")
     if db.get(Favorite, (user.id, listing_id)) is None:
         db.add(Favorite(user_id=user.id, listing_id=listing_id))
+        # Historical save count (unsaving later does not erase it from performance charts).
+        stmt = pg_insert(ListingDailyView).values(listing_id=listing_id, day=utcnow().date(), views=0, saves=1)
+        db.execute(stmt.on_conflict_do_update(index_elements=["listing_id", "day"], set_={"saves": ListingDailyView.saves + 1}))
         try:
             db.commit()
         except IntegrityError:

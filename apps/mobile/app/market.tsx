@@ -15,16 +15,17 @@ type PropertyType = Schemas["PropertyType"];
 export default function Market() {
   const { t } = useTranslation();
   const { lang } = useLanguage();
-  const params = useLocalSearchParams<{ purpose?: string; district?: string; property_type?: string }>();
+  const params = useLocalSearchParams<{ purpose?: string; district?: string; property_type?: string; project?: string }>();
   const { filters } = useFilters();
   const projects = useProjects();
-  const projectId = filters.project_id ?? projects.data?.[0]?.id;
+  // A listing link carries its own project; otherwise use the Explore project, then the first project.
+  const projectId = params.project ?? filters.project_id ?? projects.data?.[0]?.id;
   const project = projects.data?.find((p) => p.id === projectId);
   const [purpose, setPurpose] = useState<"sale" | "rent">(params.purpose === "rent" ? "rent" : filters.purpose ?? "sale");
   const [types, setTypes] = useState<PropertyType[]>(
     params.property_type && (PROPERTY_TYPES as string[]).includes(params.property_type) ? [params.property_type as PropertyType] : [],
   );
-  const q = useMarketSummary(projectId, purpose, types);
+  const q = useMarketSummary(projectId, purpose, types, lang);
 
   return (
     <Screen testID="market-screen" refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>

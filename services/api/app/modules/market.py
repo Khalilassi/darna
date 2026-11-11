@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -112,6 +112,12 @@ class MarketSummary(BaseModel):
     generated_at: datetime
 
 
+def months_ago_start(today: date, months: int) -> date:
+    """First day of the calendar month that makes a window of exactly ``months`` months ending this month."""
+    index = today.year * 12 + (today.month - 1) - (months - 1)
+    return date(index // 12, index % 12 + 1, 1)
+
+
 def _median(expr):
     return func.percentile_cont(0.5).within_group(expr)
 
@@ -162,18 +168,26 @@ def market_summary(
                            active_listings=counts.get(d.id, 0), sale=fig(sale.get(d.id)), rent=fig(rent.get(d.id)))
            for d in districts]
 
-    # Monthly trend: median per m² of asking prices set (listed or changed) in each month.
+    # Monthly trend: one observation per LISTING per month (its latest asking price that month), so the
+    # sample size counts listings, not price changes, and repricing cannot give one listing extra weight.
     value = ListingPriceEvent.sale_known_total if purpose == "sale" else ListingPriceEvent.monthly_rent
-    since = (date.today().replace(day=1) - timedelta(days=31 * (months - 1))).replace(day=1)
-    month = func.to_char(func.date_trunc("month", ListingPriceEvent.created_at), "YYYY-MM")
+    since = months_ago_start(date.today(), months)
+    month = func.to_char(func.date_trunc("month", ListingPriceEvent.created_at), "YYYY-MM").label("month")
     ev_conds = [ListingPriceEvent.project_id == project_id, ListingPriceEvent.kind != "closed", value.is_not(None),
                 ListingPriceEvent.created_at >= since]
     if district_id:
         ev_conds.append(ListingPriceEvent.district_id == district_id)
     if property_type:
         ev_conds.append(ListingPriceEvent.property_type.in_(property_type))
+    per_listing = (
+        select(month, ListingPriceEvent.listing_id, (value / ListingPriceEvent.area_sqm).label("per_sqm"))
+        .where(and_(*ev_conds))
+        .distinct(month, ListingPriceEvent.listing_id)
+        .order_by(month, ListingPriceEvent.listing_id, ListingPriceEvent.created_at.desc())
+        .subquery()
+    )
     trend_rows = db.execute(
-        select(month, func.count(), _median(value / ListingPriceEvent.area_sqm)).where(and_(*ev_conds)).group_by(month).order_by(month)
+        select(per_listing.c.month, func.count(), _median(per_listing.c.per_sqm)).group_by(per_listing.c.month).order_by(per_listing.c.month)
     ).all()
     trend = [TrendPoint(month=m, sample_size=n, median_per_sqm=_q2(med) if n >= MIN_SAMPLE else None) for m, n, med in trend_rows]
     return MarketSummary(project_id=project_id, purpose=purpose, property_types=property_type, districts=out, trend=trend,

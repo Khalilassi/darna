@@ -68,8 +68,12 @@ def test_market_summary_suppresses_small_samples(make_user, project, reviewer, c
 def test_cash_vs_installments_endpoint(make_user, project, reviewer, client):
     owner = make_user(verified=True)
     lid = publish_listing(owner, reviewer, project)
+    r = client.get(f"/listings/{lid}/financials/compare", params={"discount_rate": "0", "cash_price": "2690000", "as_of": "2026-01-01"}).json()
+    # known total 2,750,000 includes the 50,000 buyer-paid maintenance deposit, which is paid in either option
+    assert r["other_known_costs"] == "50000.00" and r["break_even_cash_price"] == "2700000.00"
+    assert r["cash_alternative_all_in"] == "2740000.00" and r["cheaper_option"] == "cash"
     r = client.get(f"/listings/{lid}/financials/compare", params={"discount_rate": "0", "cash_price": "2700000", "as_of": "2026-01-01"}).json()
-    assert r["break_even_cash_price"] == "2750000.00" and r["cheaper_option"] == "cash"
+    assert r["cheaper_option"] == "equal"
     assert r["excludes_estimates_and_unknowns"] is True  # the transfer fee is unconfirmed
     assert client.get(f"/listings/{lid}/financials/compare").status_code == 422  # a rate is required
 

@@ -17,6 +17,7 @@ export const qk = {
   myProperties: ["properties", "mine"] as const,
   myListings: ["listings", "mine"] as const,
   myListing: (id: string) => ["listings", "mine", id] as const,
+  performance: (id: string, days: number) => ["listings", "mine", id, "performance", days] as const,
   verifications: ["verifications"] as const,
   supportCases: ["support"] as const,
   priceHistory: (id: string) => ["listing", id, "price-history"] as const,
@@ -117,6 +118,14 @@ export function useMyListing(id: string) {
   });
 }
 
+/** Owner-only daily activity, totals and funnel for one listing (`days` 7..180). */
+export function useListingPerformance(id: string, days: number) {
+  return useQuery({
+    queryKey: qk.performance(id, days),
+    queryFn: async () => unwrap(await api.GET("/listings/mine/{listing_id}/performance", { params: { path: { listing_id: id }, query: { days } } })),
+  });
+}
+
 export function useVerifications() {
   return useQuery({ queryKey: qk.verifications, queryFn: async () => unwrap(await api.GET("/verifications")) });
 }
@@ -170,9 +179,10 @@ export function usePriceHistory(id: string) {
   });
 }
 
-export function useMarketSummary(projectId: string | undefined, purpose: "sale" | "rent", propertyTypes: Schemas["PropertyType"][]) {
+export function useMarketSummary(projectId: string | undefined, purpose: "sale" | "rent", propertyTypes: Schemas["PropertyType"][], lang: string) {
   return useQuery({
-    queryKey: qk.market(projectId ?? "", purpose, propertyTypes),
+    // The methodology text is localized by the server (Accept-Language), so the language is part of the key.
+    queryKey: [...qk.market(projectId ?? "", purpose, propertyTypes), lang],
     enabled: !!projectId,
     staleTime: 5 * 60_000,
     queryFn: async () =>
@@ -181,11 +191,10 @@ export function useMarketSummary(projectId: string | undefined, purpose: "sale" 
 }
 
 /** Cash vs installments comparison; `discountRate` is a fraction (0.2 = 20%). Disabled until a rate is set. */
-export function useCashComparison(listingId: string, discountRate: number | null, cashPrice: number | null) {
+export function useCashComparison(listingId: string, discountRate: number | null, cashPrice: number | null, lang: string) {
   return useQuery({
-    queryKey: ["listing", listingId, "compare", discountRate, cashPrice],
+    queryKey: ["listing", listingId, "compare", discountRate, cashPrice, lang], // assumption text is localized
     enabled: discountRate !== null,
-    placeholderData: (prev) => prev,
     queryFn: async () =>
       unwrap(
         await api.GET("/listings/{listing_id}/financials/compare", {
