@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Badge, DataState, fmtDate, PageHeader } from "./ui";
+import { useEffect, useState } from "react";
+import { Badge, DataState, fmtDate, PageHeader, Pager } from "./ui";
 import { VerificationPanel } from "./VerificationPanel";
 import type { DecisionIn, VerificationKind, VerificationStatus } from "@/lib/adminApi";
 import { useApi } from "@/lib/auth";
@@ -9,6 +9,7 @@ import { useToast } from "@/lib/toast";
 import { useAsync } from "@/lib/useAsync";
 
 const KINDS: VerificationKind[] = ["identity", "ownership", "financial"];
+const PAGE_SIZE = 25;
 const STATUSES: VerificationStatus[] = ["submitted", "under_review", "more_info_required", "approved", "rejected", "withdrawn"];
 
 export function VerificationQueue() {
@@ -17,8 +18,19 @@ export function VerificationQueue() {
   const [kind, setKind] = useState<VerificationKind | "">("");
   const [statuses, setStatuses] = useState<VerificationStatus[]>(["submitted", "under_review"]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const q = useAsync(() => api.verifications({ status: statuses, kind: kind || undefined }), [kind, statuses.join(",")]);
-  const items = q.data ?? [];
+  const [page, setPage] = useState(1);
+  const q = useAsync(
+    () => api.verifications({ status: statuses, kind: kind || undefined, page, page_size: PAGE_SIZE }),
+    [kind, statuses.join(","), page],
+  );
+  const items = q.data?.items ?? [];
+  const total = q.data?.total ?? 0;
+  // New filters start from the first page.
+  useEffect(() => setPage(1), [kind, statuses.join(",")]);
+  // Deciding the last item on the last page leaves it empty: step back.
+  useEffect(() => {
+    if (q.data && page > 1 && q.data.items.length === 0 && total > 0) setPage(Math.ceil(total / PAGE_SIZE));
+  }, [q.data, page, total]);
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
   async function decide(id: string, body: DecisionIn) {
@@ -111,6 +123,7 @@ export function VerificationQueue() {
               </tbody>
             </table>
           </DataState>
+          {q.data && <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />}
         </div>
         <div>
           {selected ? (

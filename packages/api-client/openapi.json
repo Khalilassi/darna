@@ -4783,6 +4783,37 @@
     "title": "Page[ListingCard]",
     "type": "object"
    },
+   "Page_QueueItem_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/QueueItem"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "page": {
+      "title": "Page",
+      "type": "integer"
+     },
+     "page_size": {
+      "title": "Page Size",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total",
+     "page",
+     "page_size"
+    ],
+    "title": "Page[QueueItem]",
+    "type": "object"
+   },
    "PartyRole": {
     "enum": [
      "buyer",
@@ -9084,6 +9115,7 @@
   },
   "/admin/verifications": {
    "get": {
+    "description": "Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries.",
     "operationId": "verification_queue_admin_verifications_get",
     "parameters": [
      {
@@ -9117,6 +9149,29 @@
        ],
        "title": "Kind"
       }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 25,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
      }
     ],
     "responses": {
@@ -9124,11 +9179,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/QueueItem"
-         },
-         "title": "Response Verification Queue Admin Verifications Get",
-         "type": "array"
+         "$ref": "#/components/schemas/Page_QueueItem_"
         }
        }
       },

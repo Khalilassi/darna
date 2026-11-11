@@ -89,10 +89,32 @@ describe("VerificationPanel", () => {
   });
 });
 
+const pageOf = <T,>(items: T[], total = items.length, page = 1) => ({ items, total, page, page_size: 25 });
+
 describe("VerificationQueue (mocked API)", () => {
+  it("pages through the queue and resets to page 1 when filters change", async () => {
+    const api: Partial<AdminApi> = {
+      verifications: vi.fn().mockImplementation(async (q: { page?: number }) =>
+        pageOf([{ ...identityItem, id: `vr-${q.page}`, user_name: `Applicant page ${q.page}` }], 30, q.page)),
+    };
+    render(
+      <ToastProvider>
+        <MockAuthProvider me={reviewer} api={api}>
+          <VerificationQueue />
+        </MockAuthProvider>
+      </ToastProvider>,
+    );
+    expect(await screen.findByRole("button", { name: "Applicant page 1" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(await screen.findByRole("button", { name: "Applicant page 2" })).toBeInTheDocument();
+    expect(api.verifications).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, page_size: 25 }));
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "ownership");
+    await waitFor(() => expect(api.verifications).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "ownership", page: 1 })));
+  });
+
   it("loads the queue, starts a review and refreshes", async () => {
     const api: Partial<AdminApi> = {
-      verifications: vi.fn().mockResolvedValueOnce([identityItem]).mockResolvedValueOnce([{ ...identityItem, status: "under_review" }]),
+      verifications: vi.fn().mockResolvedValueOnce(pageOf([identityItem])).mockResolvedValueOnce(pageOf([{ ...identityItem, status: "under_review" }])),
       decide: vi.fn().mockResolvedValue({ ok: true }),
     };
     render(
@@ -112,7 +134,7 @@ describe("VerificationQueue (mocked API)", () => {
   });
 
   it("shows the empty state and API errors", async () => {
-    const api: Partial<AdminApi> = { verifications: vi.fn().mockResolvedValue([]) };
+    const api: Partial<AdminApi> = { verifications: vi.fn().mockResolvedValue(pageOf([])) };
     render(
       <ToastProvider>
         <MockAuthProvider me={reviewer} api={api}>
@@ -126,7 +148,7 @@ describe("VerificationQueue (mocked API)", () => {
   it("surfaces decision failures with the API error code", async () => {
     const { ApiError } = await import("@darna/api-client");
     const api: Partial<AdminApi> = {
-      verifications: vi.fn().mockResolvedValue([identityItem]),
+      verifications: vi.fn().mockResolvedValue(pageOf([identityItem])),
       decide: vi.fn().mockRejectedValue(new ApiError(409, "self_review", "You cannot review your own submission")),
     };
     render(

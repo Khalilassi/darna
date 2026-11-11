@@ -157,7 +157,7 @@ def register_property(owner: Actor, project, **kw):
 
 
 def approve_pending_claim(reviewer: Actor, claim_id: str):
-    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()
+    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()["items"]
     vr = next(v for v in q if v["claim_id"] == claim_id)
     r = reviewer.post(f"/admin/verifications/{vr['id']}/decision", json={"decision": "approve", "note": "documents match"})
     assert r.status_code == 200, r.text

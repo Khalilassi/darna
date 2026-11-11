@@ -37,7 +37,7 @@ export function makeAdminApi(call: Call) {
   return {
     analytics: () => call((c) => c.GET("/admin/analytics")),
 
-    verifications: (query: { status?: VerificationStatus[]; kind?: VerificationKind }) =>
+    verifications: (query: { status?: VerificationStatus[]; kind?: VerificationKind; page?: number; page_size?: number }) =>
       call((c) => c.GET("/admin/verifications", { params: { query } })),
     decide: (id: string, body: DecisionIn) =>
       call((c) => c.POST("/admin/verifications/{vr_id}/decision", { params: { path: { vr_id: id } }, body })),

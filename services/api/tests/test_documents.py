@@ -55,7 +55,7 @@ def test_identity_verification_flow(make_user, reviewer):
     assert a.post("/verifications/identity", json={"document_ids": [did]}).status_code == 201
     assert a.post("/verifications/identity", json={"document_ids": [did]}).status_code == 409
     assert a.get("/auth/me").json()["verification"]["identity"] == "submitted"
-    vr = reviewer.get("/admin/verifications", params={"kind": "identity"}).json()[0]
+    vr = reviewer.get("/admin/verifications", params={"kind": "identity"}).json()["items"][0]
     r = reviewer.post(f"/admin/verifications/{vr['id']}/decision", json={"decision": "request_info"})
     assert r.status_code == 422
     reviewer.post(f"/admin/verifications/{vr['id']}/decision", json={"decision": "request_info", "note": "Back side missing"})
@@ -67,7 +67,7 @@ def test_identity_verification_flow(make_user, reviewer):
     # Reviewers cannot approve their own submission
     rd = reviewer.upload_doc("national_id")
     reviewer.post("/verifications/identity", json={"document_ids": [rd]})
-    own = next(v for v in reviewer.get("/admin/verifications").json() if v["user_id"] == str(reviewer.id))
+    own = next(v for v in reviewer.get("/admin/verifications").json()["items"] if v["user_id"] == str(reviewer.id))
     r = reviewer.post(f"/admin/verifications/{own['id']}/decision", json={"decision": "approve"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "self_review"
 
@@ -108,9 +108,21 @@ def test_admin_typed_responses_and_filters(make_user, admin, project, reviewer):
     admin.post(f"/admin/disputes/{d['id']}/resolve", json={"outcome": "dismissed", "note": "No evidence"})
     assert admin.get("/admin/disputes").json() == []
     assert len(admin.get("/admin/disputes", params={"status": "all"}).json()) == 1
-    q = reviewer.get("/admin/verifications", params={"status": ["submitted", "under_review", "approved", "rejected"]}).json()
+    q = reviewer.get("/admin/verifications", params={"status": ["submitted", "under_review", "approved", "rejected"]}).json()["items"]
     assert any(i["claim"] and i["claim"]["identity_key"] for i in q)
     assert admin.post("/admin/maintenance/expire-offers").json() == {"expired": 0}
     u = make_user(name="Reporter Person")
     u.post("/support/cases", json={"category": "other", "description": "Something needs attention"})
     assert admin.get("/admin/support").json()[0]["reporter_name"] == "Reporter Person"
+
+
+def test_verification_queue_is_paginated_oldest_first(make_user, reviewer):
+    users = [make_user() for _ in range(3)]
+    for u in users:
+        assert u.post("/verifications/identity", json={"document_ids": [u.upload_doc("national_id")]}).status_code == 201
+    p1 = reviewer.get("/admin/verifications", params={"kind": "identity", "page_size": 2}).json()
+    p2 = reviewer.get("/admin/verifications", params={"kind": "identity", "page_size": 2, "page": 2}).json()
+    assert p1["total"] == p2["total"] == 3 and (p1["page"], p2["page"]) == (1, 2)
+    assert [i["user_id"] for i in p1["items"] + p2["items"]] == [str(u.id) for u in users]
+    assert all(len(i["documents"]) == 1 for i in p1["items"] + p2["items"])
+    assert reviewer.get("/admin/verifications", params={"page_size": 101}).status_code == 422

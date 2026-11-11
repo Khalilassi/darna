@@ -70,7 +70,6 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - Media URLs come from `DARNA_PUBLIC_BASE_URL`; the mobile app rewrites `localhost` for emulators. Set the env var to a reachable host for device testing.
 - Validation details carry a `type` code (business rules use `rule_error`) and `ctx` limits; the mobile app localizes them. Types without a translation fall back to the English message (English UI) or a generic message (Arabic UI). Admin and web still show the English text.
 - Rate limiting is per-process (in-memory, with eviction of inactive keys). The worker must be scheduled externally (cron / platform scheduler) or run with `--interval`.
-- Verification queue has no pagination.
 - The dev database used during this session contains extra test records from agent E2E runs; reset with `python seed.py --reset`.
 
 ## Next implementation tasks (priority order) — see `docs/BACKLOG.md`

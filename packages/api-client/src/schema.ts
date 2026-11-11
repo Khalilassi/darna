@@ -304,7 +304,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Verification Queue */
+        /**
+         * Verification Queue
+         * @description Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries.
+         */
         get: operations["verification_queue_admin_verifications_get"];
         put?: never;
         post?: never;
@@ -3086,6 +3089,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Page[QueueItem] */
+        Page_QueueItem_: {
+            /** Items */
+            items: components["schemas"]["QueueItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
         /**
          * PartyRole
          * @enum {string}
@@ -4733,6 +4747,8 @@ export interface operations {
             query?: {
                 status?: components["schemas"]["VerificationStatus"][];
                 kind?: components["schemas"]["VerificationKind"] | null;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -4746,7 +4762,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QueueItem"][];
+                    "application/json": components["schemas"]["Page_QueueItem_"];
                 };
             };
             /** @description Validation Error */

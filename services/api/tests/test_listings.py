@@ -227,7 +227,7 @@ def test_financial_verification_upgrades_provenance_and_edit_resets(make_user, p
     doc = owner.upload_doc("developer_statement")
     r = owner.post("/verifications/financial", json={"listing_id": lid, "document_ids": [doc]})
     assert r.status_code == 201
-    vr = next(v for v in reviewer.get("/admin/verifications", params={"kind": "financial"}).json())
+    vr = next(v for v in reviewer.get("/admin/verifications", params={"kind": "financial"}).json()["items"])
     assert reviewer.post(f"/admin/verifications/{vr['id']}/decision", json={"decision": "approve"}).status_code == 200
     pub = client.get(f"/listings/{lid}").json()
     assert pub["financials_verified"] is True

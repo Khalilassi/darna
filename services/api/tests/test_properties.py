@@ -24,7 +24,7 @@ def test_register_property_creates_claim_and_verification(make_user, project, re
     body = r.json()
     assert body["claim"]["status"] == "submitted"
     assert owner.get("/auth/me").json()["verification"]["pending_ownership_claims"] == 1
-    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()
+    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()["items"]
     assert len(q) == 1 and q[0]["claim"]["identity_key"].endswith("|7|45|12")
 
 
@@ -126,7 +126,7 @@ def test_competing_claim_opens_dispute_and_resolution(make_user, project, review
     # Duplicate active claim by the same user is blocked
     assert challenger.post(f"/properties/{pid}/claims", json={"document_ids": [doc]}).status_code == 409
     # Reviewer cannot simply approve a disputed claim
-    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()
+    q = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()["items"]
     vr = next(v for v in q if v["claim_id"] == r.json()["id"])
     res = reviewer.post(f"/admin/verifications/{vr['id']}/decision", json={"decision": "approve", "note": "x"})
     assert res.status_code == 409 and res.json()["error"]["code"] == "dispute_open"

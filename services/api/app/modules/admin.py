@@ -144,27 +144,37 @@ class DecisionIn(BaseModel):
     supersede_existing: bool = False
 
 
-@router.get("/verifications", response_model=list[QueueItem])
+@router.get("/verifications", response_model=Page[QueueItem])
 def verification_queue(status: list[VS] = Query(default=[VS.submitted, VS.under_review]), kind: VerificationKind | None = None,
+                       page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
                        _: User = Depends(require("verification.review")), db: Session = Depends(get_db)):
-    stmt = select(VerificationRequest).options(joinedload(VerificationRequest.user)).where(VerificationRequest.status.in_(status))
+    """Oldest first (FIFO), paginated; documents and claims are loaded in two batched queries."""
+    stmt = select(VerificationRequest).where(VerificationRequest.status.in_(status))
     if kind:
         stmt = stmt.where(VerificationRequest.kind == kind)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.options(joinedload(VerificationRequest.user))
+                      .order_by(VerificationRequest.created_at, VerificationRequest.id)
+                      .offset((page - 1) * page_size).limit(page_size)).all()
+    doc_ids = {uuid.UUID(d) for vr in rows for d in vr.document_ids}
+    docs = {d.id: d for d in db.scalars(select(Document).where(Document.id.in_(doc_ids)))} if doc_ids else {}
+    claim_ids = {vr.claim_id for vr in rows if vr.claim_id}
+    claims = ({c.id: c for c in db.scalars(select(OwnershipClaim).options(joinedload(OwnershipClaim.property))
+                                            .where(OwnershipClaim.id.in_(claim_ids)))} if claim_ids else {})
     out = []
-    for vr in db.scalars(stmt.order_by(VerificationRequest.created_at)).all():
-        docs = db.scalars(select(Document).where(Document.id.in_([uuid.UUID(d) for d in vr.document_ids]))).all()
+    for vr in rows:
         claim = None
-        if vr.claim_id:
-            c = db.scalar(select(OwnershipClaim).options(joinedload(OwnershipClaim.property)).where(OwnershipClaim.id == vr.claim_id))
-            if c:
-                p = c.property
-                claim = QueueClaim(status=c.status, capacity=c.capacity.value, principal_name=c.principal_name,
-                                   authority_scope=c.authority_scope, property_id=p.id, identity_key=p.identity_key,
-                                   property_type=p.property_type.value, area_sqm=str(p.area_sqm))
+        c = claims.get(vr.claim_id) if vr.claim_id else None
+        if c:
+            p = c.property
+            claim = QueueClaim(status=c.status, capacity=c.capacity.value, principal_name=c.principal_name,
+                               authority_scope=c.authority_scope, property_id=p.id, identity_key=p.identity_key,
+                               property_type=p.property_type.value, area_sqm=str(p.area_sqm))
+        vr_docs = [docs[uuid.UUID(d)] for d in vr.document_ids if uuid.UUID(d) in docs]
         out.append(QueueItem(id=vr.id, kind=vr.kind, status=vr.status, user_id=vr.user_id, user_name=vr.user.full_name,
                              claim_id=vr.claim_id, listing_id=vr.listing_id, note=vr.note,
-                             documents=[DocRef.model_validate(d) for d in docs], claim=claim, created_at=vr.created_at))
-    return out
+                             documents=[DocRef.model_validate(d) for d in vr_docs], claim=claim, created_at=vr.created_at))
+    return Page(items=out, total=total, page=page, page_size=page_size)
 
 
 @router.post("/verifications/{vr_id}/decision", response_model=Ok)
