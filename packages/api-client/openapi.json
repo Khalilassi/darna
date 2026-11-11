@@ -301,6 +301,228 @@
     "title": "AdminListingOut",
     "type": "object"
    },
+   "AdminProviderOut": {
+    "properties": {
+     "category": {
+      "$ref": "#/components/schemas/ServiceCategory"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "description_ar": {
+      "title": "Description Ar",
+      "type": "string"
+     },
+     "description_en": {
+      "title": "Description En",
+      "type": "string"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "is_active": {
+      "title": "Is Active",
+      "type": "boolean"
+     },
+     "license_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "License Number"
+     },
+     "name_ar": {
+      "title": "Name Ar",
+      "type": "string"
+     },
+     "name_en": {
+      "title": "Name En",
+      "type": "string"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "project_ids": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Project Ids",
+      "type": "array"
+     },
+     "referral_fee_disclosure_ar": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure Ar"
+     },
+     "referral_fee_disclosure_en": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure En"
+     },
+     "verified": {
+      "title": "Verified",
+      "type": "boolean"
+     },
+     "verified_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verified At"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     }
+    },
+    "required": [
+     "id",
+     "category",
+     "name_en",
+     "name_ar",
+     "description_en",
+     "description_ar",
+     "phone",
+     "email",
+     "website",
+     "license_number",
+     "project_ids",
+     "referral_fee_disclosure_en",
+     "referral_fee_disclosure_ar",
+     "verified",
+     "is_active",
+     "verified_at",
+     "created_at"
+    ],
+    "title": "AdminProviderOut",
+    "type": "object"
+   },
+   "AdminReferralOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "deal_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Deal Id"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "provider_id": {
+      "format": "uuid",
+      "title": "Provider Id",
+      "type": "string"
+     },
+     "provider_name": {
+      "title": "Provider Name",
+      "type": "string"
+     },
+     "provider_name_ar": {
+      "title": "Provider Name Ar",
+      "type": "string"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ReferralStatus"
+     },
+     "user_name": {
+      "title": "User Name",
+      "type": "string"
+     },
+     "user_phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Phone"
+     }
+    },
+    "required": [
+     "id",
+     "provider_id",
+     "provider_name",
+     "provider_name_ar",
+     "user_name",
+     "user_phone",
+     "deal_id",
+     "message",
+     "status",
+     "created_at"
+    ],
+    "title": "AdminReferralOut",
+    "type": "object"
+   },
    "AdminUserOut": {
     "properties": {
      "created_at": {
@@ -906,6 +1128,20 @@
    },
    "ChecklistOut": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "submit",
+        "accept",
+        "waive",
+        "reopen"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "code": {
       "title": "Code",
       "type": "string"
@@ -5119,6 +5355,431 @@
     "title": "Provenance",
     "type": "string"
    },
+   "ProviderIn": {
+    "properties": {
+     "category": {
+      "$ref": "#/components/schemas/ServiceCategory"
+     },
+     "description_ar": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description Ar",
+      "type": "string"
+     },
+     "description_en": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description En",
+      "type": "string"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "format": "email",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "is_active": {
+      "default": true,
+      "title": "Is Active",
+      "type": "boolean"
+     },
+     "license_number": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "License Number"
+     },
+     "name_ar": {
+      "maxLength": 120,
+      "minLength": 2,
+      "title": "Name Ar",
+      "type": "string"
+     },
+     "name_en": {
+      "maxLength": 120,
+      "minLength": 2,
+      "title": "Name En",
+      "type": "string"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "pattern": "^\\+?[0-9]{8,15}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "project_ids": {
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Project Ids",
+      "type": "array"
+     },
+     "referral_fee_disclosure_ar": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure Ar"
+     },
+     "referral_fee_disclosure_en": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure En"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "format": "uri",
+        "maxLength": 2083,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     }
+    },
+    "required": [
+     "category",
+     "name_en",
+     "name_ar"
+    ],
+    "title": "ProviderIn",
+    "type": "object"
+   },
+   "ProviderOut": {
+    "properties": {
+     "category": {
+      "$ref": "#/components/schemas/ServiceCategory"
+     },
+     "description_ar": {
+      "title": "Description Ar",
+      "type": "string"
+     },
+     "description_en": {
+      "title": "Description En",
+      "type": "string"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "license_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "License Number"
+     },
+     "name_ar": {
+      "title": "Name Ar",
+      "type": "string"
+     },
+     "name_en": {
+      "title": "Name En",
+      "type": "string"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "project_ids": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Project Ids",
+      "type": "array"
+     },
+     "referral_fee_disclosure_ar": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure Ar"
+     },
+     "referral_fee_disclosure_en": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure En"
+     },
+     "verified": {
+      "title": "Verified",
+      "type": "boolean"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     }
+    },
+    "required": [
+     "id",
+     "category",
+     "name_en",
+     "name_ar",
+     "description_en",
+     "description_ar",
+     "phone",
+     "email",
+     "website",
+     "license_number",
+     "project_ids",
+     "referral_fee_disclosure_en",
+     "referral_fee_disclosure_ar",
+     "verified"
+    ],
+    "title": "ProviderOut",
+    "type": "object"
+   },
+   "ProviderPatch": {
+    "properties": {
+     "category": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ServiceCategory"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "description_ar": {
+      "anyOf": [
+       {
+        "maxLength": 2000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description Ar"
+     },
+     "description_en": {
+      "anyOf": [
+       {
+        "maxLength": 2000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description En"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "format": "email",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "license_number": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "License Number"
+     },
+     "name_ar": {
+      "anyOf": [
+       {
+        "maxLength": 120,
+        "minLength": 2,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name Ar"
+     },
+     "name_en": {
+      "anyOf": [
+       {
+        "maxLength": 120,
+        "minLength": 2,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name En"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "pattern": "^\\+?[0-9]{8,15}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "project_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "format": "uuid",
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Ids"
+     },
+     "referral_fee_disclosure_ar": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure Ar"
+     },
+     "referral_fee_disclosure_en": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Referral Fee Disclosure En"
+     },
+     "verified": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verified"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "format": "uri",
+        "maxLength": 2083,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     }
+    },
+    "title": "ProviderPatch",
+    "type": "object"
+   },
    "QueueClaim": {
     "properties": {
      "area_sqm": {
@@ -5271,6 +5932,127 @@
      "created_at"
     ],
     "title": "QueueItem",
+    "type": "object"
+   },
+   "ReferralIn": {
+    "properties": {
+     "acknowledged_disclosure": {
+      "default": false,
+      "title": "Acknowledged Disclosure",
+      "type": "boolean"
+     },
+     "deal_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Deal Id"
+     },
+     "message": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Message",
+      "type": "string"
+     },
+     "provider_id": {
+      "format": "uuid",
+      "title": "Provider Id",
+      "type": "string"
+     },
+     "share_phone": {
+      "default": false,
+      "title": "Share Phone",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "provider_id"
+    ],
+    "title": "ReferralIn",
+    "type": "object"
+   },
+   "ReferralOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "deal_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Deal Id"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "provider": {
+      "$ref": "#/components/schemas/ProviderOut"
+     },
+     "share_phone": {
+      "title": "Share Phone",
+      "type": "boolean"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ReferralStatus"
+     }
+    },
+    "required": [
+     "id",
+     "provider",
+     "deal_id",
+     "message",
+     "share_phone",
+     "status",
+     "created_at"
+    ],
+    "title": "ReferralOut",
+    "type": "object"
+   },
+   "ReferralStatus": {
+    "enum": [
+     "requested",
+     "contacted",
+     "completed",
+     "cancelled"
+    ],
+    "title": "ReferralStatus",
+    "type": "string"
+   },
+   "ReferralStatusIn": {
+    "properties": {
+     "status": {
+      "enum": [
+       "contacted",
+       "completed",
+       "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "ReferralStatusIn",
     "type": "object"
    },
    "RefreshIn": {
@@ -6589,6 +7371,19 @@
     "title": "SentOut",
     "type": "object"
    },
+   "ServiceCategory": {
+    "enum": [
+     "lawyer",
+     "notary_services",
+     "surveyor",
+     "mover",
+     "maintenance",
+     "interior",
+     "cleaning"
+    ],
+    "title": "ServiceCategory",
+    "type": "string"
+   },
    "SignedUrlOut": {
     "properties": {
      "expires_at": {
@@ -6629,6 +7424,37 @@
      "resend_after_seconds"
     ],
     "title": "StartOut",
+    "type": "object"
+   },
+   "SuggestionsOut": {
+    "properties": {
+     "categories": {
+      "items": {
+       "$ref": "#/components/schemas/ServiceCategory"
+      },
+      "title": "Categories",
+      "type": "array"
+     },
+     "deal_id": {
+      "format": "uuid",
+      "title": "Deal Id",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "status": {
+      "$ref": "#/components/schemas/DealStatus"
+     }
+    },
+    "required": [
+     "deal_id",
+     "status",
+     "categories",
+     "note"
+    ],
+    "title": "SuggestionsOut",
     "type": "object"
    },
    "SupportCategory": {
@@ -7028,6 +7854,21 @@
    },
    "ViewingOut": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "confirm",
+        "decline",
+        "cancel",
+        "complete",
+        "no_show"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -7100,6 +7941,21 @@
    },
    "ViewingWithListing": {
     "properties": {
+     "allowed_actions": {
+      "default": [],
+      "items": {
+       "enum": [
+        "confirm",
+        "decline",
+        "cancel",
+        "complete",
+        "no_show"
+       ],
+       "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -7696,6 +8552,279 @@
      }
     ],
     "summary": "Run Expiry",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/admin/services/providers": {
+   "get": {
+    "operationId": "admin_providers_admin_services_providers_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/ServiceCategory"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AdminProviderOut"
+         },
+         "title": "Response Admin Providers Admin Services Providers Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Admin Providers",
+    "tags": [
+     "admin"
+    ]
+   },
+   "post": {
+    "operationId": "create_provider_admin_services_providers_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProviderIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminProviderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Provider",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/admin/services/providers/{provider_id}": {
+   "patch": {
+    "operationId": "update_provider_admin_services_providers__provider_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "provider_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Provider Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProviderPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminProviderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Provider",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/admin/services/referrals": {
+   "get": {
+    "operationId": "admin_referrals_admin_services_referrals_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "default": [],
+       "items": {
+        "$ref": "#/components/schemas/ReferralStatus"
+       },
+       "title": "Status",
+       "type": "array"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AdminReferralOut"
+         },
+         "title": "Response Admin Referrals Admin Services Referrals Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Admin Referrals",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/admin/services/referrals/{referral_id}": {
+   "patch": {
+    "operationId": "update_referral_admin_services_referrals__referral_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "referral_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Referral Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReferralStatusIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminReferralOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Referral",
     "tags": [
      "admin"
     ]
@@ -11691,6 +12820,246 @@
     "summary": "Results",
     "tags": [
      "saved searches"
+    ]
+   }
+  },
+  "/services/providers": {
+   "get": {
+    "operationId": "providers_services_providers_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/ServiceCategory"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     },
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ProviderOut"
+         },
+         "title": "Response Providers Services Providers Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Providers",
+    "tags": [
+     "services"
+    ]
+   }
+  },
+  "/services/referrals": {
+   "get": {
+    "operationId": "my_referrals_services_referrals_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReferralOut"
+         },
+         "title": "Response My Referrals Services Referrals Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "My Referrals",
+    "tags": [
+     "services"
+    ]
+   },
+   "post": {
+    "operationId": "request_referral_services_referrals_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReferralIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReferralOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Request Referral",
+    "tags": [
+     "services"
+    ]
+   }
+  },
+  "/services/referrals/{referral_id}/cancel": {
+   "post": {
+    "operationId": "cancel_referral_services_referrals__referral_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "referral_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Referral Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReferralOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Referral",
+    "tags": [
+     "services"
+    ]
+   }
+  },
+  "/services/suggestions": {
+   "get": {
+    "operationId": "suggestions_services_suggestions_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Deal Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SuggestionsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Suggestions",
+    "tags": [
+     "services"
     ]
    }
   },

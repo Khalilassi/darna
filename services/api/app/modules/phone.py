@@ -20,6 +20,7 @@ from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user
 from app.core.errors import Conflict, RateLimited, ValidationFailed
 from app.core.sms import sms_sender
+from app.core.validation import rule_error
 from app.models.entities import PhoneVerification, User
 from app.schemas.common import Ok
 
@@ -42,7 +43,7 @@ def normalize_phone(raw: str) -> str:
     elif digits.startswith("20") and not digits.startswith("+"):
         digits = "+" + digits
     if not EG_MOBILE.match(digits):
-        raise ValueError("enter an Egyptian mobile number, e.g. 010 1234 5678")
+        raise rule_error("invalid_egyptian_mobile", "enter an Egyptian mobile number, e.g. 010 1234 5678")
     return digits
 
 

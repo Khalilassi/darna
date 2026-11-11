@@ -6,14 +6,15 @@ import { useTranslation } from "react-i18next";
 import type { Schemas } from "@darna/api-client";
 import { api, unwrap } from "../../src/api/client";
 import { errorCode, errorMessage } from "../../src/api/errors";
-import { qk, useDeal } from "../../src/api/queries";
+import { qk, useDeal, useServiceSuggestions } from "../../src/api/queries";
 import {
   Badge, Button, Card, Divider, ErrorState, KeyValue, LoadingState, Notice, Row, Screen, Section, SignInRequired, Stepper, T, TextField, type BadgeTone,
 } from "../../src/components";
 import { OfferForm, type OfferPayload } from "../../src/features/OfferForm";
+import { ServiceSuggestionsCard } from "../../src/features/Services";
 import { formatDate, formatMoney, formatRelative, localizeDigits } from "../../src/i18n/format";
 import { useLanguage } from "../../src/i18n/LanguageProvider";
-import { CHECKLIST_DOC_KIND, checklistActions, checklistAvailable, DEAL_TRACK, roleLabel, type ChecklistAction } from "../../src/lib/deal";
+import { CHECKLIST_DOC_KIND, checklistAvailable, DEAL_TRACK, roleLabel, type ChecklistAction } from "../../src/lib/deal";
 import { useIdempotencyKeys } from "../../src/lib/idempotency";
 import { pickDocument, uploadDocument } from "../../src/lib/upload";
 import { useTheme } from "../../src/theme";
@@ -74,6 +75,7 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
   const qc = useQueryClient();
   const { colors } = useTheme();
   const withKey = useIdempotencyKeys();
+  const suggestions = useServiceSuggestions(d.id, d.status);
   const [mode, setMode] = useState<"none" | "counter" | "new">("none");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -321,11 +323,16 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
         </Section>
       ) : null}
 
+      <ServiceSuggestionsCard
+        suggestions={suggestions.data}
+        onOpen={(category) => router.push(`/services?category=${category}&dealId=${d.id}`)}
+      />
+
       <Section title={t("deal.checklist")}>
         {!available && d.status === "negotiating" ? <T variant="caption" tone="muted">{t("deal.checklistLocked")}</T> : null}
         <Card>
           {d.checklist.map((item, i) => {
-            const actions = checklistActions(item, d.my_role, available);
+            const actions: ChecklistAction[] = item.allowed_actions ?? [];
             const mine = item.responsible === d.my_role;
             return (
               <View key={item.id} style={{ gap: 6 }} testID={`check-${item.code}`}>

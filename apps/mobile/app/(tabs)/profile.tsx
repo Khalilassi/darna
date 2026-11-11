@@ -75,6 +75,8 @@ export default function Profile() {
           <MenuRow icon="home-outline" label={t("profile.ownerHub")} onPress={() => router.push("/owner")} testID="menu-owner" />
           <MenuRow icon="bookmark-outline" label={t("savedSearch.title")} onPress={() => router.push("/saved-searches")} badge={newMatches} testID="menu-saved-searches" />
           <MenuRow icon="stats-chart-outline" label={t("market.title")} onPress={() => router.push("/market")} testID="menu-market" />
+          <MenuRow icon="briefcase-outline" label={t("services.menuDirectory")} onPress={() => router.push("/services")} testID="menu-services" />
+          <MenuRow icon="paper-plane-outline" label={t("services.menuReferrals")} onPress={() => router.push("/services/referrals")} testID="menu-referrals" />
           <MenuRow icon="calendar-outline" label={t("profile.viewings")} onPress={() => router.push("/viewings")} />
           <MenuRow icon="notifications-outline" label={t("profile.notifications")} onPress={() => router.push("/notifications")} badge={notifications.data?.unread} />
           <MenuRow icon="options-outline" label={t("profile.notificationSettings")} onPress={() => router.push("/notification-settings")} testID="menu-notification-settings" />

@@ -29,6 +29,7 @@ PERMISSIONS: dict[str, set[Role]] = {
     "analytics.read": {Role.admin, Role.reviewer, Role.support},
     "deal.monitor": {Role.admin, Role.support},
     "document.review": {Role.admin, Role.reviewer},
+    "services.manage": {Role.admin, Role.support},
 }
 
 

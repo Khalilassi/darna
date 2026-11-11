@@ -19,25 +19,6 @@ const STATUS_TONE: Record<Schemas["ViewingStatus"], BadgeTone> = {
   requested: "warning", confirmed: "success", declined: "danger", cancelled: "neutral", completed: "verified", no_show: "danger",
 };
 
-/**
- * Actions mirror the API's viewing rules (owner confirms/declines/marks no-show; either party
- * cancels or marks completed; completion only after the time). The API has no `allowed_actions`
- * field for viewings, so these are derived here and the server remains the authority.
- */
-export function viewingActions(v: Pick<Viewing, "status" | "my_role" | "proposed_at">, now = new Date()): Action[] {
-  const owner = v.my_role === "owner";
-  const past = new Date(v.proposed_at) <= now;
-  if (v.status === "requested") return owner ? ["confirm", "decline", "cancel"] : ["cancel"];
-  if (v.status === "confirmed") {
-    const out: Action[] = [];
-    if (past) out.push("complete");
-    if (past && owner) out.push("no_show");
-    out.push("cancel");
-    return out;
-  }
-  return [];
-}
-
 export function ViewingsList() {
   const { t } = useTranslation();
   const { lang } = useLanguage();
@@ -66,7 +47,7 @@ export function ViewingsList() {
       contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
       ListHeaderComponent={error ? <Notice tone="danger">{error}</Notice> : undefined}
       renderItem={({ item: v }) => {
-        const actions = viewingActions(v);
+        const actions = v.allowed_actions ?? [];
         return (
           <Card onPress={() => router.push(`/listing/${v.listing_id}`)} accessibilityLabel={v.listing_title} testID={`viewing-${v.id}`}>
             <Row style={{ justifyContent: "space-between" }}>

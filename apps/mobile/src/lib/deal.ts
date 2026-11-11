@@ -37,14 +37,4 @@ export const CHECKLIST_DOC_KIND: Record<string, Schemas["DocumentKind"]> = {
 
 export type ChecklistAction = Schemas["ChecklistUpdate"]["action"];
 
-/** Mirrors the API's checklist rules for which buttons to offer (the server still validates). */
-export function checklistActions(item: Pick<Schemas["ChecklistOut"], "responsible" | "status">, myRole: Schemas["PartyRole"], available: boolean): ChecklistAction[] {
-  if (!available) return [];
-  const mine = item.responsible === myRole;
-  if (mine) return item.status === "pending" ? ["submit"] : [];
-  if (item.status === "submitted") return ["accept", "reopen", "waive"];
-  if (item.status === "pending") return ["waive"];
-  return [];
-}
-
 export const checklistAvailable = (status: DealStatus) => !["negotiating", "cancelled", "completed"].includes(status);

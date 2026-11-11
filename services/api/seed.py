@@ -316,7 +316,28 @@ def _review_and_activity_samples(db, owners, buyer, newowner, mad, project) -> N
         db.add(DealEvent(deal_id=deal.id, actor_id=buyer.id, type="deal.opened", data={"kind": "sale"}))
         assert deal.status == DealStatus.negotiating
 
-    # 4. A support case.
+    # 4. Synthetic service providers (verified for the demo; not real businesses).
+    from app.models.entities import ServiceProvider
+    from app.models.enums import ServiceCategory
+
+    for cat, en, ar, disclosure in (
+        (ServiceCategory.lawyer, "Demo Legal Partners (synthetic)", "شركاء قانونيون تجريبيون", True),
+        (ServiceCategory.notary_services, "Demo Registry Assist (synthetic)", "مساعدة تسجيل تجريبية", False),
+        (ServiceCategory.surveyor, "Demo Property Inspect (synthetic)", "فحص عقاري تجريبي", False),
+        (ServiceCategory.mover, "Demo Movers (synthetic)", "نقل أثاث تجريبي", True),
+        (ServiceCategory.cleaning, "Demo Cleaning Co (synthetic)", "شركة تنظيف تجريبية", False),
+    ):
+        db.add(ServiceProvider(
+            category=cat, name_en=en, name_ar=ar,
+            description_en="Synthetic provider for development. Not a real business.",
+            description_ar="مزود تجريبي لأغراض التطوير. ليس نشاطًا حقيقيًا.",
+            email=f"{cat.value}@example.com", license_number=f"SYN-{cat.value.upper()}",
+            referral_fee_disclosure_en="Darna may receive a fixed referral fee if you hire this provider." if disclosure else None,
+            referral_fee_disclosure_ar="قد تحصل دارنا على رسوم إحالة ثابتة إذا تعاملت مع هذا المزود." if disclosure else None,
+            verified_at=NOW, is_active=True,
+        ))
+
+    # 5. A support case.
     db.add(SupportCase(reporter_id=buyer.id, category=SupportCategory.broker_report, subject_type="listing",
                        description="Synthetic demo report: caller said they represent an agency."))
 

@@ -23,6 +23,7 @@ from app.modules import (
     phone,
     properties,
     saved_searches,
+    services,
     support,
     verification,
     viewings,
@@ -64,6 +65,8 @@ def create_app() -> FastAPI:
 
     for r in (auth, phone, catalog, documents, verification, properties, market, performance, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
+    app.include_router(services.router)
+    app.include_router(services.admin_router)
 
     if settings.storage_backend == "local":  # with s3, photos are served by the CDN / bucket
         media = settings.storage_dir / "public"

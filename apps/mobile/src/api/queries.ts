@@ -24,6 +24,9 @@ export const qk = {
   market: (projectId: string, purpose: string, types: string[]) => ["public", "market", projectId, purpose, ...types] as const,
   savedSearches: ["saved-searches"] as const,
   savedSearchResults: (id: string) => ["saved-searches", id, "results"] as const,
+  serviceProviders: ["public", "services", "providers"] as const,
+  serviceSuggestions: (dealId: string, status: string) => ["services", "suggestions", dealId, status] as const,
+  myReferrals: ["services", "referrals"] as const,
 };
 
 export function useProjects() {
@@ -242,5 +245,43 @@ export function useDeleteSavedSearch() {
     mutationFn: async (id: string) => unwrap(await api.DELETE("/saved-searches/{saved_id}", { params: { path: { saved_id: id } } })),
     onSuccess: (_d, id) => qc.setQueryData<Schemas["SavedSearchOut"][]>(qk.savedSearches, (old) => old?.filter((s) => s.id !== id)),
     onSettled: () => void qc.invalidateQueries({ queryKey: qk.savedSearches }),
+  });
+}
+
+/** Verified, active providers (public). Filtered by category on the client so one cache serves every chip. */
+export function useServiceProviders() {
+  return useQuery({ queryKey: qk.serviceProviders, staleTime: 5 * 60_000, queryFn: async () => unwrap(await api.GET("/services/providers")) });
+}
+
+/** Suggested provider categories for a deal; keyed by the deal status so a stage change refetches. */
+export function useServiceSuggestions(dealId: string, status: string) {
+  return useQuery({
+    queryKey: qk.serviceSuggestions(dealId, status),
+    staleTime: 10 * 60_000,
+    queryFn: async () => unwrap(await api.GET("/services/suggestions", { params: { query: { deal_id: dealId } } })),
+  });
+}
+
+export function useMyReferrals() {
+  const { status } = useAuth();
+  return useQuery({ queryKey: qk.myReferrals, enabled: status === "signedIn", queryFn: async () => unwrap(await api.GET("/services/referrals")) });
+}
+
+export function useRequestReferral() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: Schemas["ReferralIn"]) => unwrap(await api.POST("/services/referrals", { body })),
+    onSuccess: (r) => qc.setQueryData<Schemas["ReferralOut"][]>(qk.myReferrals, (old) => (old ? [r, ...old.filter((x) => x.id !== r.id)] : old)),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.myReferrals }),
+  });
+}
+
+export function useCancelReferral() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST("/services/referrals/{referral_id}/cancel", { params: { path: { referral_id: id } } })),
+    onSuccess: (r) => qc.setQueryData<Schemas["ReferralOut"][]>(qk.myReferrals, (old) => old?.map((x) => (x.id === r.id ? r : x))),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.myReferrals }),
   });
 }

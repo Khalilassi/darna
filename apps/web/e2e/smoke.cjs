@@ -11,6 +11,12 @@ const check = (name, ok, detail = "") => {
   results.push({ name, ok });
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 };
+const AXE_PATH = require.resolve("axe-core/axe.min.js");
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const axeRun = async (page) => {
+  await page.addScriptTag({ path: AXE_PATH });
+  return page.evaluate((tags) => window.axe.run(document, { runOnly: { type: "tag", values: tags } }).then((r) => r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => ({ target: n.target, failureSummary: n.failureSummary })) }))), AXE_TAGS);
+};
 const noHScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 (async () => {
@@ -66,6 +72,7 @@ const noHScroll = (page) => page.evaluate(() => document.documentElement.scrollW
   await m.screenshot({ path: path.join(SHOTS, "listing-detail-ar-375.png") });
   check("Arabic detail page is RTL", arDetail === "rtl");
 
+  const detailId = new URL(page.url()).pathname.match(/[0-9a-f-]{36}$/)?.[0];
   const errorsBefore404 = errors.length;
   const notFound = await page.goto(WEB + "/en/listings/00000000-0000-0000-0000-000000000000");
   check("unknown listing returns 404", notFound.status() === 404);
@@ -74,6 +81,70 @@ const noHScroll = (page) => page.evaluate(() => document.documentElement.scrollW
   const robots = await (await page.request.get(WEB + "/robots.txt")).text();
   check("robots.txt references sitemap", robots.includes("Sitemap:"));
   check("no console errors (excluding the deliberate 404)", errorsBefore404 === 0, errors.slice(0, 3).join(" | "));
+
+  // Accessibility: axe-core (WCAG 2.1 A + AA) on every public page type, both languages, desktop and 375px.
+  // Any serious/critical violation fails the run; moderate/minor ones are printed for information.
+  check("a11y: found a listing id to audit", !!detailId);
+  const a11yPaths = (l) => [`/${l}`, `/${l}/listings`, ...(detailId ? [`/${l}/listings/${detailId}`] : []), `/${l}/listings/00000000-0000-0000-0000-000000000000`];
+  for (const [vp, ctx] of [["desktop", desktop], ["375px", mobile]]) {
+    const ap = await ctx.newPage();
+    for (const l of ["en", "ar"]) {
+      for (const p of a11yPaths(l)) {
+        await ap.goto(WEB + p, { waitUntil: "load" });
+        const violations = await axeRun(ap);
+        const blocking = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+        const label = `${p.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/, (s) => (s.startsWith("00000000") ? ":unknown" : ":id"))} @ ${vp}`;
+        for (const v of violations) {
+          console.log(`  axe ${v.impact.padEnd(8)} ${v.id} ×${v.nodes.length} on ${label} — e.g. ${v.nodes[0].target.join(" ")}: ${v.nodes[0].failureSummary.split("\n").slice(1, 2).join("").trim()}`);
+        }
+        check(`a11y: no serious/critical axe violations: ${label}`, blocking.length === 0, blocking.map((v) => `${v.id}×${v.nodes.length}`).join(", "));
+      }
+    }
+    await ap.close();
+  }
+
+  // Keyboard: Tab through the landing page; every focused element must show a visible focus indicator (>=2px outline,
+  // matched by :focus-visible, on screen and not covered by the sticky header), and focus must reach the skip link,
+  // the language switch and both hero CTAs.
+  for (const l of ["en", "ar"]) {
+    const kp = await desktop.newPage();
+    await kp.goto(WEB + `/${l}`);
+    const t = l === "en" ? { skip: "Skip to content", lang: "العربية", browse: "Browse homes", app: "Get the app" } : { skip: "انتقل إلى المحتوى", lang: "English", browse: "تصفح البيوت", app: "حمّل التطبيق" };
+    const seen = [];
+    const invisible = [];
+    for (let i = 0; i < 12; i++) {
+      await kp.keyboard.press("Tab");
+      // The page uses smooth scrolling, so wait for the focused element to be scrolled into view (max 2s).
+      await kp
+        .waitForFunction(() => {
+          const r = document.activeElement?.getBoundingClientRect();
+          return !r || (r.top >= 0 && r.bottom <= innerHeight);
+        }, null, { timeout: 2000 })
+        .catch(() => {});
+      const f = await kp.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const outline = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) >= 2;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        const onScreen = r.width > 0 && r.height > 0 && !!hit && (el === hit || el.contains(hit));
+        return { text: (el.getAttribute("aria-label") || el.textContent || "").trim(), cls: el.className, visible: outline && onScreen && el.matches(":focus-visible") };
+      });
+      if (!f) continue;
+      seen.push(f);
+      if (!f.visible) invisible.push(f.text || f.cls);
+    }
+    const reached = (name) => seen.some((f) => f.text === name);
+    check(`keyboard /${l}: focus indicator visible on every tab stop`, invisible.length === 0, invisible.join(", "));
+    check(`keyboard /${l}: Tab reaches skip link, language switch and hero CTAs`, [t.skip, t.lang, t.browse, t.app].every(reached), seen.map((f) => f.text).join(" → "));
+    // Skip link moves focus to <main>.
+    await kp.goto(WEB + `/${l}`);
+    await kp.keyboard.press("Tab");
+    await kp.keyboard.press("Enter");
+    check(`keyboard /${l}: skip link moves focus to main`, (await kp.evaluate(() => document.activeElement?.id)) === "main");
+    await kp.close();
+  }
 
   await browser.close();
   const failed = results.filter((r) => !r.ok).length;

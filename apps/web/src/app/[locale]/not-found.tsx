@@ -4,7 +4,9 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div className="container section stack gap-md center">
-      <h1>Page not found · الصفحة غير موجودة</h1>
+      <h1>
+        Page not found · <span lang="ar">الصفحة غير موجودة</span>
+      </h1>
       <p className="muted">The page you&apos;re looking for doesn&apos;t exist, or this listing is no longer available.</p>
       <p className="row-center">
         <Link className="btn btn-primary" href="/en/listings">

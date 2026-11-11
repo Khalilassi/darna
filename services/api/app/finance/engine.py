@@ -28,6 +28,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.validation import rule_error
 from app.models.enums import Payer, PaymentMode, Provenance
 
 CENT = Decimal("0.01")
@@ -49,11 +50,11 @@ class Amount(BaseModel):
     @model_validator(mode="after")
     def _check(self) -> Amount:
         if self.provenance == Provenance.unknown and self.amount is not None:
-            raise ValueError("unknown provenance must not carry an amount")
+            raise rule_error("unknown_amount_not_allowed", "unknown provenance must not carry an amount")
         if self.provenance != Provenance.unknown and self.amount is None:
-            raise ValueError("amount is required unless provenance is 'unknown'")
+            raise rule_error("amount_required", "amount is required unless provenance is 'unknown'")
         if self.provenance == Provenance.estimate and not self.assumption:
-            raise ValueError("estimates must state their assumption")
+            raise rule_error("estimate_assumption_required", "estimates must state their assumption")
         return self
 
     @property
@@ -92,18 +93,18 @@ class SaleInput(BaseModel):
     @model_validator(mode="after")
     def _check(self) -> SaleInput:
         if self.owner_cash_price.amount is None:
-            raise ValueError("owner_cash_price must be a known amount")
+            raise rule_error("cash_price_required", "owner_cash_price must be a known amount")
         if self.payment_mode == PaymentMode.cash and self.installments:
-            raise ValueError("cash resale must not have remaining developer installments")
+            raise rule_error("cash_resale_has_installments", "cash resale must not have remaining developer installments")
         if self.payment_mode == PaymentMode.installments and not self.installments:
-            raise ValueError("installment resale requires the remaining installment schedule")
+            raise rule_error("installments_required", "installment resale requires the remaining installment schedule")
         codes = [f.code for f in self.fees]
         if len(codes) != len(set(codes)):
-            raise ValueError("fee codes must be unique")
+            raise rule_error("duplicate_fee_codes", "fee codes must be unique")
         if any(i.provenance in (Provenance.estimate, Provenance.unknown) for i in self.installments):
-            raise ValueError("installment amounts must be seller-provided or verified, not estimates or unknown")
+            raise rule_error("installment_provenance_invalid", "installment amounts must be seller-provided or verified, not estimates or unknown")
         if self.overdue_payer == Payer.split or self.maintenance_payer == Payer.split:
-            raise ValueError("overdue and maintenance payers must be buyer, seller or included_in_price")
+            raise rule_error("invalid_payer", "overdue and maintenance payers must be buyer, seller or included_in_price")
         return self
 
 

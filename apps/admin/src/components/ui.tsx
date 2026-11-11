@@ -75,9 +75,17 @@ export function shortId(id: string | null | undefined): string {
   return id ? id.slice(0, 8) : "—";
 }
 
-export function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+export function Modal({
+  title, onClose, children, footer, wide,
+}: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass inline closures; keep the latest in a ref so re-renders (e.g. typing in a field inside the dialog)
+  // don't re-run the focus effect, which would bounce focus to the trigger and back to the first control.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const node = ref.current;
@@ -87,13 +95,20 @@ export function Modal({ title, onClose, children, footer }: { title: string; onC
       );
     (focusable()[0] ?? node)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+      }
       if (e.key === "Tab") {
         const els = focusable();
         if (!els.length) return;
         const first = els[0];
         const last = els[els.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
+        if (!node?.contains(document.activeElement)) {
+          // Focus was lost (e.g. the focused button became disabled while busy): bring it back into the dialog.
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
@@ -105,12 +120,15 @@ export function Modal({ title, onClose, children, footer }: { title: string; onC
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      previous?.focus?.();
+      // Return focus to the control that opened the dialog (if it is still in the document).
+      // Otherwise (e.g. its table row went away after the action) fall back to <main> so focus is not lost.
+      if (previous?.isConnected) previous.focus();
+      else document.getElementById("main")?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onCloseRef.current()}>
+      <div className={wide ? "modal modal-wide" : "modal"} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
         <h2 id={titleId}>{title}</h2>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}

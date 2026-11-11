@@ -157,6 +157,7 @@ class ChecklistOut(ORM):
     required_for: DS
     status: ChecklistStatus
     document_id: uuid.UUID | None
+    allowed_actions: list[Literal["submit", "accept", "waive", "reopen"]] = []
 
 
 class EventOut(ORM):
@@ -274,6 +275,38 @@ def _blocking(deal: Deal, target: DS) -> list[str]:
     return [c.code for c in deal.checklist if c.required_for == target and c.status not in DONE]
 
 
+CHECKLIST_ACTIONS = ("submit", "accept", "waive", "reopen")
+
+
+def checklist_action_error(deal: Deal, item: ChecklistItem, role: PartyRole, action: str) -> Exception | None:
+    """Single source of truth for checklist permissions: the endpoint raises the returned
+    error, and responses advertise the actions for which it is None."""
+    if deal.status in (DS.negotiating, DS.cancelled, DS.completed):
+        return Conflict("The checklist is available once terms are agreed", code="checklist_unavailable")
+    if action == "submit":
+        if item.responsible != role:
+            return Forbidden("This item is the other party's responsibility", code="not_responsible")
+        if item.status != ChecklistStatus.pending:
+            return Conflict("Item already submitted", code="checklist_item_closed")
+    elif action in ("accept", "waive"):
+        if item.responsible == role:
+            return Forbidden("The counterparty reviews this item", code="not_reviewer")
+        if action == "accept" and item.status != ChecklistStatus.submitted:
+            return Conflict("Item has not been submitted", code="checklist_item_not_submitted")
+        if item.status in DONE:
+            return Conflict("Item already closed", code="checklist_item_closed")
+    elif action == "reopen":
+        if item.responsible == role or item.status != ChecklistStatus.submitted:
+            return Conflict("Only a submitted item can be sent back by the reviewer", code="checklist_item_not_submitted")
+    return None
+
+
+def _checklist_out(deal: Deal, item: ChecklistItem, role: PartyRole) -> ChecklistOut:
+    out = ChecklistOut.model_validate(item)
+    out.allowed_actions = [a for a in CHECKLIST_ACTIONS if checklist_action_error(deal, item, role, a) is None]
+    return out
+
+
 def _out(db: Session, deal: Deal, user: User) -> DealOut:
     role = _role(deal, user)
     fsm = FSM[deal.kind]
@@ -297,7 +330,7 @@ def _out(db: Session, deal: Deal, user: User) -> DealOut:
         my_role=role, counterpart_name=other.full_name.split(" ")[0] if other else "",
         latest_offer=OfferOut.model_validate(latest) if latest else None, updated_at=deal.updated_at,
         agreed_terms=deal.agreed_terms, offers=[OfferOut.model_validate(o) for o in deal.offers],
-        checklist=[ChecklistOut.model_validate(c) for c in deal.checklist],
+        checklist=[_checklist_out(deal, c, role) for c in deal.checklist],
         events=[EventOut.model_validate(e) for e in deal.events], next_steps=steps,
         can_cancel=fsm.can(deal.status, DS.cancelled), property_disclosure=disclosure,
         cancel_reason=deal.cancel_reason, closed_at=deal.closed_at,
@@ -573,11 +606,10 @@ def update_checklist(deal_id: uuid.UUID, item_id: uuid.UUID, body: ChecklistUpda
     item = db.scalar(select(ChecklistItem).where(ChecklistItem.id == item_id, ChecklistItem.deal_id == deal.id).with_for_update())
     if item is None:
         raise NotFound("Checklist item not found")
+    err = checklist_action_error(deal, item, role, body.action)
+    if err is not None:
+        raise err
     if body.action == "submit":
-        if item.responsible != role:
-            raise Forbidden("This item is the other party's responsibility", code="not_responsible")
-        if item.status not in (ChecklistStatus.pending,):
-            raise Conflict("Item already submitted", code="checklist_item_closed")
         if body.document_id:
             doc = db.get(Document, body.document_id)
             if doc is None or doc.owner_id != user.id or doc.deleted_at:
@@ -585,16 +617,8 @@ def update_checklist(deal_id: uuid.UUID, item_id: uuid.UUID, body: ChecklistUpda
             item.document_id = doc.id
         item.status = ChecklistStatus.submitted
     elif body.action in ("accept", "waive"):
-        if item.responsible == role:
-            raise Forbidden("The counterparty reviews this item", code="not_reviewer")
-        if body.action == "accept" and item.status != ChecklistStatus.submitted:
-            raise Conflict("Item has not been submitted", code="checklist_item_not_submitted")
-        if item.status in DONE:
-            raise Conflict("Item already closed", code="checklist_item_closed")
         item.status = ChecklistStatus.accepted if body.action == "accept" else ChecklistStatus.waived
     elif body.action == "reopen":
-        if item.responsible == role or item.status != ChecklistStatus.submitted:
-            raise Conflict("Only a submitted item can be sent back by the reviewer", code="checklist_item_not_submitted")
         item.status = ChecklistStatus.pending
     _event(db, deal, user, f"checklist.{body.action}", code=item.code)
     notify(db, _other(deal, role), "checklist_updated", deal_id=deal.id, code=item.code)

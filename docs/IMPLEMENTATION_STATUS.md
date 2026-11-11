@@ -28,8 +28,10 @@ _Last updated: 2026-11-11. Future sessions: read this first, then `README.md` an
 | Phone verification by SMS code (dev SMS sender only) | ✅ | ✅ verify screen + status badge | – | – |
 | Account lockout after repeated failed sign-ins | ✅ | ✅ message with minutes left | ✅ (shared API) | – |
 | S3-compatible storage, key rotation, ClamAV upload scanning, Redis rate limiting | ✅ | – | – | – |
-| Owner listing performance: daily views/saves/inquiries/viewings/offers, funnel | ✅ | 🚧 in progress | – | – |
+| Owner listing performance: daily views/saves/inquiries/viewings/offers, funnel | ✅ | ✅ | – | – |
 | Observability: request ids (header, error bodies, logs), JSON logs, Prometheus /metrics | ✅ | – | – | – |
+| Professional services directory (verified providers, stage suggestions, referrals with fee disclosure) | ✅ | 🚧 in progress | 🚧 in progress | – |
+| Search performance: trigram indexes, single-pass page/total (`docs/architecture/performance.md`) | ✅ | – | – | – |
 | Audit log, analytics, user management (roles, suspension) | ✅ | – | ✅ | – |
 | EN/AR + RTL, EGP formatting, light/dark | – | ✅ | – | ✅ |
 | Public marketing site, SEO (metadata, sitemap, robots, hreflang) | – | – | – | ✅ |
@@ -42,7 +44,7 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 
 | Check | Result |
 |---|---|
-| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **150 passed** |
+| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **176 passed** |
 | `services/api`: `ruff check .` | pass |
 | `services/api`: `alembic upgrade head` + `alembic check` (models match migrations) | pass |
 | `apps/mobile`: `tsc --noEmit` / `jest` | pass / **59 passed** (11 suites) |
@@ -66,8 +68,7 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - Native RTL switching (requires app reload via `I18nManager.forceRTL`) is untested on devices.
 - Native date pickers (Android dialog / iOS sheet), the OS push permission prompt and real push delivery are untested (need a device + EAS project + FCM/APNs credentials).
 - Media URLs come from `DARNA_PUBLIC_BASE_URL`; the mobile app rewrites `localhost` for emulators. Set the env var to a reachable host for device testing.
-- Some `validation_failed` messages are English developer text; Arabic UI shows a generic message for them.
-- Viewing and checklist responses don't include server-computed allowed actions (the client derives them; the server remains authoritative).
+- Validation details carry a `type` code (business rules use `rule_error`) and `ctx` limits; the mobile app localizes them. Types without a translation fall back to the English message (English UI) or a generic message (Arabic UI). Admin and web still show the English text.
 - Rate limiting is per-process (in-memory, with eviction of inactive keys). The worker must be scheduled externally (cron / platform scheduler) or run with `--interval`.
 - Verification queue has no pagination.
 - The dev database used during this session contains extra test records from agent E2E runs; reset with `python seed.py --reset`.

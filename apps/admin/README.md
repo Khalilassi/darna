@@ -11,6 +11,7 @@ npm run build -w @darna/admin && npm run start -w @darna/admin
 npm run typecheck -w @darna/admin # next typegen + tsc
 npm run test -w @darna/admin      # Vitest + Testing Library
 npm run e2e -w @darna/admin       # Playwright smoke against running app + API (seeds one identity verification in the DEV db)
+                                  # also fails on serious/critical axe-core (WCAG 2.1 AA) violations, dialog focus and keyboard/skip-link regressions
 ```
 
 ## Auth & permissions
@@ -22,6 +23,13 @@ npm run e2e -w @darna/admin       # Playwright smoke against running app + API (
 ## Pages
 Dashboard (analytics, "Expire stale offers"), Verification queue (filters, detail panel, signed-URL documents, decisions,
 ownership supersede with warning), Listings moderation, Disputes (existing vs challenger), Duplicate candidates, Users
-(search, role, suspend/reactivate with reason), Deals monitor, Support cases, Audit log.
+(search, role, suspend/reactivate with reason), Deals monitor, Support cases, Service providers (create/edit, verify,
+activate; `services.manage` = admin + support), Referral requests (status filter, contacted/completed/cancelled), Audit log.
+
+## Accessibility
+Text colours use AA-safe variants defined in `globals.css` (`--c-text-muted-aa`, `--c-accent-aa`, `--c-warning-aa`,
+`--c-success-aa`: the design tokens mixed towards `--c-text`), because some light-scheme token pairs are below 4.5:1.
+Use them for text; raw tokens are fine for borders/icons. Dialogs (`Modal`/`ConfirmDialog`) move focus inside, trap Tab,
+close on Escape and return focus to the trigger.
 
 Screenshots: `docs/screenshots/`.

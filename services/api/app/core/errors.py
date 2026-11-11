@@ -5,6 +5,7 @@ Clients localize by ``code``; ``message`` is an English developer-facing fallbac
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -78,9 +79,16 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError):
-        details = [
-            {"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")} for e in exc.errors()
-        ]
+        details = []
+        for e in exc.errors():
+            d = {"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
+            # Limits (max_length, ge, pattern, ...) let clients build localized messages.
+            # Only plain scalars are passed through: ctx may also hold the raised exception.
+            ctx = {k: (str(v) if isinstance(v, Decimal) else v) for k, v in (e.get("ctx") or {}).items()
+                   if isinstance(v, (str, int, float, bool, Decimal)) and k != "error"}
+            if ctx:
+                d["ctx"] = ctx
+            details.append(d)
         return JSONResponse(status_code=422, content=_body("validation_failed", "Invalid request", details))
 
     @app.exception_handler(StarletteHTTPException)

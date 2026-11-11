@@ -38,6 +38,10 @@ export function Button({
     <Pressable
       testID={testID}
       onPress={inactive ? undefined : onPress}
+      // `disabled` + aria-* make the state reach screen readers on web too (accessibilityState alone does not).
+      disabled={!!inactive}
+      aria-disabled={!!inactive}
+      aria-busy={!!loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
@@ -79,6 +83,8 @@ export function IconButton({
     <Pressable
       testID={testID}
       onPress={disabled ? undefined : onPress}
+      disabled={!!disabled}
+      aria-disabled={!!disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}

@@ -51,7 +51,9 @@ from app.models.enums import (
     Orientation,
     PartyRole,
     PropertyType,
+    ReferralStatus,
     Role,
+    ServiceCategory,
     SupportCategory,
     SupportStatus,
     VerificationKind,
@@ -266,6 +268,10 @@ class Listing(IdMixin, TimestampMixin, Base):
             postgresql_where=text(f"status IN ({_in_list(LISTING_OCCUPYING_STATUSES)})"),
         ),
         Index("ix_listings_status_published", "status", "published_at"),
+        # Trigram indexes make ILIKE '%term%' text search fast for selective terms (pg_trgm extension).
+        Index("ix_listings_title_trgm", "title", postgresql_using="gin", postgresql_ops={"title": "gin_trgm_ops"}),
+        Index("ix_listings_description_trgm", "description", postgresql_using="gin",
+              postgresql_ops={"description": "gin_trgm_ops"}),
     )
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -533,6 +539,48 @@ class LoginThrottle(Base):
     failures: Mapped[int] = mapped_column(Integer, default=0)
     window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ServiceProvider(IdMixin, TimestampMixin, Base):
+    """An independent professional the platform can refer users to. Never a party to a transaction."""
+
+    __tablename__ = "service_providers"
+    category: Mapped[ServiceCategory] = mapped_column(E(ServiceCategory, "service_category"), index=True)
+    name_en: Mapped[str] = mapped_column(String(120))
+    name_ar: Mapped[str] = mapped_column(String(120))
+    description_en: Mapped[str] = mapped_column(Text, default="")
+    description_ar: Mapped[str] = mapped_column(Text, default="")
+    phone: Mapped[str | None] = mapped_column(String(32))
+    email: Mapped[str | None] = mapped_column(String(254))
+    website: Mapped[str | None] = mapped_column(String(200))
+    license_number: Mapped[str | None] = mapped_column(String(80))
+    project_ids: Mapped[list[str]] = mapped_column(Json, default=list)  # communities served; empty = all
+    # Transparency: if Darna receives anything for referrals, users see this text before requesting one.
+    referral_fee_disclosure_en: Mapped[str | None] = mapped_column(String(300))
+    referral_fee_disclosure_ar: Mapped[str | None] = mapped_column(String(300))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verified_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ServiceReferral(IdMixin, TimestampMixin, Base):
+    __tablename__ = "service_referrals"
+    provider_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("service_providers.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    deal_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("deals.id", ondelete="SET NULL"))
+    message: Mapped[str] = mapped_column(String(1000), default="")
+    # The user explicitly agreed to share these contact details with the provider.
+    share_phone: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The verified number at the time of consent; a later phone change is not shared without a new opt-in.
+    shared_phone: Mapped[str | None] = mapped_column(String(20))
+    status: Mapped[ReferralStatus] = mapped_column(E(ReferralStatus, "referral_status"), default=ReferralStatus.requested)
+    provider: Mapped[ServiceProvider] = relationship()
+
+    __table_args__ = (
+        # At most one open request per user and provider, also under concurrent requests.
+        Index("uq_service_referrals_open", "user_id", "provider_id", unique=True,
+              postgresql_where=text("status IN ('requested', 'contacted')")),
+    )
 
 
 class IdempotencyRecord(Base):

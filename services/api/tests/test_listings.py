@@ -118,6 +118,7 @@ def test_invalid_sale_terms_rejected(make_user, project, reviewer):
     terms = {**SALE_TERMS, "payment_mode": "cash"}  # cash with installments is contradictory
     r = owner.post("/listings", json={"property_id": pid, "purpose": "sale", "title": "Contradictory terms", "sale_terms": terms})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_sale_terms"
+    assert [d["type"] for d in r.json()["error"]["details"]] == ["cash_resale_has_installments"]
     r = owner.post("/listings", json={"property_id": pid, "purpose": "sale", "title": "Missing terms here"})
     assert r.status_code == 422
 
@@ -234,3 +235,23 @@ def test_financial_verification_upgrades_provenance_and_edit_resets(make_user, p
     owner.post(f"/listings/{lid}/actions", json={"action": "pause"})
     owner.patch(f"/listings/{lid}", json={"sale_terms": SALE_TERMS})
     assert owner.get(f"/listings/mine/{lid}").json()["financials_verified"] is False
+
+
+def test_search_total_and_pages_with_single_pass(make_user, project, reviewer, client):
+    owner = make_user(verified=True)
+    ids = {publish_listing(owner, reviewer, project, unit=str(i)) for i in range(3)}
+    p1 = client.get("/listings", params={"page_size": 2}).json()
+    p2 = client.get("/listings", params={"page_size": 2, "page": 2}).json()
+    assert p1["total"] == p2["total"] == 3 and len(p1["items"]) == 2 and len(p2["items"]) == 1
+    assert {x["id"] for x in p1["items"] + p2["items"]} == ids
+    beyond = client.get("/listings", params={"page_size": 2, "page": 5}).json()
+    assert beyond["items"] == [] and beyond["total"] == 3  # total still correct past the last page
+    assert client.get("/listings", params={"q": "nomatchxyz"}).json() == {"items": [], "total": 0, "page": 1, "page_size": 20}
+
+
+def test_migrations_create_trigram_search_indexes(db):
+    """alembic check skips *_trgm indexes (opclass reflection), so assert the migration really creates them."""
+    from sqlalchemy import text as _t
+    names = set(db.execute(_t("select indexname from pg_indexes where tablename = 'listings' and indexname like '%trgm%'")).scalars())
+    assert names == {"ix_listings_title_trgm", "ix_listings_description_trgm"}
+    assert db.execute(_t("select count(*) from pg_extension where extname = 'pg_trgm'")).scalar() == 1
