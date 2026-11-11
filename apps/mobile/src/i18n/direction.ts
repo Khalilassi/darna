@@ -33,5 +33,3 @@ export function applyDirection(lang: Language, platform: string = Platform.OS): 
 /** Icons that imply direction (chevrons, arrows) must be mirrored in RTL. */
 export const mirrorTransform = (rtl: boolean) => (rtl ? [{ scaleX: -1 as const }] : []);
 
-/** Row direction for content that must stay in reading order on web and on native. */
-export const rowDirection = () => "row" as const;

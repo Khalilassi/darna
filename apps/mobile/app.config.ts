@@ -15,7 +15,6 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   icon: "./assets/icon.png",
-  splash: { image: "./assets/icon.png", resizeMode: "contain", backgroundColor: "#F8F6F2" },
   ios: {
     bundleIdentifier: "com.darna.app", // placeholder: replace with the registered App ID
     supportsTablet: false,
