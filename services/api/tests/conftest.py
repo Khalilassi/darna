@@ -42,6 +42,9 @@ def _schema():
 
 @pytest.fixture(autouse=True)
 def _clean():
+    from app.core import notify
+
+    notify.run_async = lambda fn: fn()  # deliver pushes inline and deterministically in tests
     yield
     names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     with get_engine().begin() as c:

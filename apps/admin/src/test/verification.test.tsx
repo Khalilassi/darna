@@ -39,6 +39,7 @@ const reviewer: Me = {
   locale: "en",
   role: "reviewer",
   identity_verified_at: null,
+  mfa_enabled_at: null,
   created_at: "2026-01-01T00:00:00Z",
   verification: { information_submitted: false, identity: "none", approved_ownership_claims: 0, pending_ownership_claims: 0 },
 };

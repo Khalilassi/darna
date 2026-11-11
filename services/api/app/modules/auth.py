@@ -8,12 +8,12 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import rate_limit
+from app.core import rate_limit, totp
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user
-from app.core.errors import Conflict, Unauthorized, ValidationFailed
+from app.core.errors import Conflict, Forbidden, Unauthorized, ValidationFailed
 from app.core.security import (
     DUMMY_HASH,
     create_access_token,
@@ -48,6 +48,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str = Field(max_length=128)
+    totp_code: str | None = Field(default=None, max_length=10)
 
 
 class RefreshIn(BaseModel):
@@ -76,6 +77,7 @@ class MeOut(ORM):
     locale: str
     role: Role
     identity_verified_at: datetime | None
+    mfa_enabled_at: datetime | None
     created_at: datetime
 
 
@@ -131,6 +133,15 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> Tok
         raise Unauthorized("Invalid email or password", code="invalid_credentials")
     if not user.is_active:
         raise Unauthorized("Account suspended", code="account_suspended")
+    if user.mfa_enabled_at is not None:
+        if not body.totp_code:
+            raise Unauthorized("Two-factor code required", code="mfa_required")
+        counter = totp.verify(totp.decrypt_secret(user.totp_secret_encrypted or ""), body.totp_code, user.totp_last_counter)
+        if counter is None:
+            audit(db, "user.mfa_failed", "user", user.id, ip=client_ip(request))
+            db.commit()
+            raise Unauthorized("Invalid two-factor code", code="mfa_invalid")
+        user.totp_last_counter = counter
     out = _issue_tokens(db, user)
     db.commit()
     return out
@@ -195,3 +206,63 @@ def update_me(body: MeUpdate, user: User = Depends(current_user), db: Session = 
 
 
 _ = VerificationStatus  # re-exported for typing clarity
+
+
+# --------------------------------------------------------------------------- two-factor authentication
+class MfaSetupOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class MfaCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
+
+
+class MfaDisableIn(MfaCodeIn):
+    password: str = Field(max_length=128)
+
+
+@router.post("/mfa/setup", response_model=MfaSetupOut, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
+def mfa_setup(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm."""
+    if user.mfa_enabled_at:
+        raise Conflict("Two-factor authentication is already enabled", code="mfa_already_enabled")
+    secret = totp.new_secret()
+    user.totp_secret_encrypted = totp.encrypt_secret(secret)
+    user.totp_last_counter = None
+    audit(db, "user.mfa_setup_started", "user", user.id, actor_id=user.id, ip=client_ip(request))
+    db.commit()
+    return MfaSetupOut(secret=secret, otpauth_uri=totp.provisioning_uri(secret, user.email))
+
+
+@router.post("/mfa/confirm", response_model=Ok, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
+def mfa_confirm(body: MfaCodeIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if user.mfa_enabled_at or not user.totp_secret_encrypted:
+        raise Conflict("Start setup first", code="mfa_not_pending")
+    counter = totp.verify(totp.decrypt_secret(user.totp_secret_encrypted), body.code, user.totp_last_counter)
+    if counter is None:
+        raise ValidationFailed("Invalid code", code="mfa_invalid")
+    user.totp_last_counter = counter
+    user.mfa_enabled_at = utcnow()
+    audit(db, "user.mfa_enabled", "user", user.id, actor_id=user.id, ip=client_ip(request))
+    db.commit()
+    return Ok()
+
+
+@router.post("/mfa/disable", response_model=Ok, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
+def mfa_disable(body: MfaDisableIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not user.mfa_enabled_at:
+        raise Conflict("Two-factor authentication is not enabled", code="mfa_not_enabled")
+    if get_settings().require_staff_mfa and user.role != Role.member:
+        raise Forbidden("Staff accounts must keep two-factor authentication on", code="mfa_required_for_staff")
+    if not verify_password(body.password, user.password_hash):
+        raise Unauthorized("Invalid password", code="invalid_credentials")
+    counter = totp.verify(totp.decrypt_secret(user.totp_secret_encrypted or ""), body.code, user.totp_last_counter)
+    if counter is None:
+        raise ValidationFailed("Invalid code", code="mfa_invalid")
+    user.mfa_enabled_at = None
+    user.totp_secret_encrypted = None
+    user.totp_last_counter = None
+    audit(db, "user.mfa_disabled", "user", user.id, actor_id=user.id, ip=client_ip(request))
+    db.commit()
+    return Ok()

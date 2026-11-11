@@ -85,6 +85,23 @@ class User(IdMixin, TimestampMixin, Base):
     not_broker_attested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     identity_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     suspended_reason: Mapped[str | None] = mapped_column(String(500))
+    # Per-category notification preferences, e.g. {"push": {"messages": true, "offers": true, ...}}
+    notification_prefs: Mapped[dict] = mapped_column(Json, default=dict, server_default="{}")
+    # Staff two-factor auth: TOTP secret encrypted with the document key; enabled once confirmed.
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(String(300))
+    mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    totp_last_counter: Mapped[int | None] = mapped_column(Integer)
+
+
+class DeviceToken(IdMixin, Base):
+    """Push notification address of one app install (Expo push token)."""
+
+    __tablename__ = "device_tokens"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token: Mapped[str] = mapped_column(String(200), unique=True)
+    platform: Mapped[str] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class RefreshToken(IdMixin, Base):

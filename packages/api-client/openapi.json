@@ -1474,6 +1474,31 @@
     "title": "DeliveryStatus",
     "type": "string"
    },
+   "DeviceIn": {
+    "properties": {
+     "platform": {
+      "enum": [
+       "ios",
+       "android"
+      ],
+      "title": "Platform",
+      "type": "string"
+     },
+     "token": {
+      "maxLength": 200,
+      "minLength": 10,
+      "pattern": "^(ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_\\-]+\\]$",
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token",
+     "platform"
+    ],
+    "title": "DeviceIn",
+    "type": "object"
+   },
    "DisputeOut": {
     "properties": {
      "challenger": {
@@ -2846,6 +2871,18 @@
       "maxLength": 128,
       "title": "Password",
       "type": "string"
+     },
+     "totp_code": {
+      "anyOf": [
+       {
+        "maxLength": 10,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Totp Code"
      }
     },
     "required": [
@@ -2891,6 +2928,18 @@
       "title": "Locale",
       "type": "string"
      },
+     "mfa_enabled_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mfa Enabled At"
+     },
      "phone": {
       "anyOf": [
        {
@@ -2917,6 +2966,7 @@
      "locale",
      "role",
      "identity_verified_at",
+     "mfa_enabled_at",
      "created_at",
      "verification"
     ],
@@ -2959,6 +3009,18 @@
       "title": "Locale",
       "type": "string"
      },
+     "mfa_enabled_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mfa Enabled At"
+     },
      "phone": {
       "anyOf": [
        {
@@ -2982,6 +3044,7 @@
      "locale",
      "role",
      "identity_verified_at",
+     "mfa_enabled_at",
      "created_at"
     ],
     "title": "MeOut",
@@ -3087,6 +3150,62 @@
      "read_at"
     ],
     "title": "MessageOut",
+    "type": "object"
+   },
+   "MfaCodeIn": {
+    "properties": {
+     "code": {
+      "maxLength": 6,
+      "minLength": 6,
+      "pattern": "^[0-9]{6}$",
+      "title": "Code",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code"
+    ],
+    "title": "MfaCodeIn",
+    "type": "object"
+   },
+   "MfaDisableIn": {
+    "properties": {
+     "code": {
+      "maxLength": 6,
+      "minLength": 6,
+      "pattern": "^[0-9]{6}$",
+      "title": "Code",
+      "type": "string"
+     },
+     "password": {
+      "maxLength": 128,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "password"
+    ],
+    "title": "MfaDisableIn",
+    "type": "object"
+   },
+   "MfaSetupOut": {
+    "properties": {
+     "otpauth_uri": {
+      "title": "Otpauth Uri",
+      "type": "string"
+     },
+     "secret": {
+      "title": "Secret",
+      "type": "string"
+     }
+    },
+    "required": [
+     "secret",
+     "otpauth_uri"
+    ],
+    "title": "MfaSetupOut",
     "type": "object"
    },
    "ModerateIn": {
@@ -4137,6 +4256,38 @@
      "position"
     ],
     "title": "PhotoOut",
+    "type": "object"
+   },
+   "PrefsIn": {
+    "properties": {
+     "push": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "title": "Push",
+      "type": "object"
+     }
+    },
+    "required": [
+     "push"
+    ],
+    "title": "PrefsIn",
+    "type": "object"
+   },
+   "PrefsOut": {
+    "properties": {
+     "push": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "title": "Push",
+      "type": "object"
+     }
+    },
+    "required": [
+     "push"
+    ],
+    "title": "PrefsOut",
     "type": "object"
    },
    "PresentValue": {
@@ -6958,6 +7109,128 @@
     ]
    }
   },
+  "/auth/mfa/confirm": {
+   "post": {
+    "operationId": "mfa_confirm_auth_mfa_confirm_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaCodeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Confirm",
+    "tags": [
+     "auth",
+     "me"
+    ]
+   }
+  },
+  "/auth/mfa/disable": {
+   "post": {
+    "operationId": "mfa_disable_auth_mfa_disable_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaDisableIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Disable",
+    "tags": [
+     "auth",
+     "me"
+    ]
+   }
+  },
+  "/auth/mfa/setup": {
+   "post": {
+    "description": "Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.",
+    "operationId": "mfa_setup_auth_mfa_setup_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MfaSetupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Setup",
+    "tags": [
+     "auth",
+     "me"
+    ]
+   }
+  },
   "/auth/refresh": {
    "post": {
     "operationId": "refresh_auth_refresh_post",
@@ -9169,6 +9442,169 @@
      }
     ],
     "summary": "List Notifications",
+    "tags": [
+     "notifications"
+    ]
+   }
+  },
+  "/notifications/devices": {
+   "delete": {
+    "operationId": "unregister_device_notifications_devices_delete",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "maxLength": 200,
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unregister Device",
+    "tags": [
+     "notifications"
+    ]
+   },
+   "post": {
+    "description": "Idempotent. A token moves to the latest user who registers it (shared/reinstalled devices).",
+    "operationId": "register_device_notifications_devices_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Register Device",
+    "tags": [
+     "notifications"
+    ]
+   }
+  },
+  "/notifications/preferences": {
+   "get": {
+    "operationId": "get_prefs_notifications_preferences_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PrefsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Prefs",
+    "tags": [
+     "notifications"
+    ]
+   },
+   "put": {
+    "operationId": "set_prefs_notifications_preferences_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PrefsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PrefsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Prefs",
     "tags": [
      "notifications"
     ]

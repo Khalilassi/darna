@@ -7,6 +7,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.errors import Forbidden, Unauthorized
 from app.core.security import decode_access_token
@@ -53,6 +54,8 @@ def require(permission: str) -> Callable[..., User]:
     def dep(user: User = Depends(current_user)) -> User:
         if user.role not in PERMISSIONS[permission]:
             raise Forbidden(f"Missing permission {permission}", code="missing_permission")
+        if get_settings().require_staff_mfa and user.mfa_enabled_at is None:
+            raise Forbidden("Set up two-factor authentication to use staff tools", code="mfa_enrollment_required")
         return user
 
     return dep
