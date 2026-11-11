@@ -160,6 +160,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/services/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Providers */
+        get: operations["admin_providers_admin_services_providers_get"];
+        put?: never;
+        /** Create Provider */
+        post: operations["create_provider_admin_services_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/services/providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Provider */
+        patch: operations["update_provider_admin_services_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/admin/services/referrals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Referrals */
+        get: operations["admin_referrals_admin_services_referrals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/services/referrals/{referral_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Referral */
+        patch: operations["update_referral_admin_services_referrals__referral_id__patch"];
+        trace?: never;
+    };
     "/admin/support": {
         parameters: {
             query?: never;
@@ -1200,6 +1269,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Providers */
+        get: operations["providers_services_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/referrals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Referrals */
+        get: operations["my_referrals_services_referrals_get"];
+        put?: never;
+        /** Request Referral */
+        post: operations["request_referral_services_referrals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/referrals/{referral_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Referral */
+        post: operations["cancel_referral_services_referrals__referral_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggestions */
+        get: operations["suggestions_services_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/support/cases": {
         parameters: {
             query?: never;
@@ -1434,6 +1572,77 @@ export interface components {
             status: components["schemas"]["ListingStatus"];
             /** Title */
             title: string;
+        };
+        /** AdminProviderOut */
+        AdminProviderOut: {
+            category: components["schemas"]["ServiceCategory"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description Ar */
+            description_ar: string;
+            /** Description En */
+            description_en: string;
+            /** Email */
+            email: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** License Number */
+            license_number: string | null;
+            /** Name Ar */
+            name_ar: string;
+            /** Name En */
+            name_en: string;
+            /** Phone */
+            phone: string | null;
+            /** Project Ids */
+            project_ids: string[];
+            /** Referral Fee Disclosure Ar */
+            referral_fee_disclosure_ar: string | null;
+            /** Referral Fee Disclosure En */
+            referral_fee_disclosure_en: string | null;
+            /** Verified */
+            verified: boolean;
+            /** Verified At */
+            verified_at: string | null;
+            /** Website */
+            website: string | null;
+        };
+        /** AdminReferralOut */
+        AdminReferralOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deal Id */
+            deal_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Message */
+            message: string;
+            /**
+             * Provider Id
+             * Format: uuid
+             */
+            provider_id: string;
+            /** Provider Name */
+            provider_name: string;
+            status: components["schemas"]["ReferralStatus"];
+            /** User Name */
+            user_name: string;
+            /** User Phone */
+            user_phone: string | null;
         };
         /** AdminUserOut */
         AdminUserOut: {
@@ -3073,6 +3282,106 @@ export interface components {
          * @enum {string}
          */
         Provenance: "verified" | "seller_provided" | "estimate" | "unknown";
+        /** ProviderIn */
+        ProviderIn: {
+            category: components["schemas"]["ServiceCategory"];
+            /**
+             * Description Ar
+             * @default
+             */
+            description_ar: string;
+            /**
+             * Description En
+             * @default
+             */
+            description_en: string;
+            /** Email */
+            email?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** License Number */
+            license_number?: string | null;
+            /** Name Ar */
+            name_ar: string;
+            /** Name En */
+            name_en: string;
+            /** Phone */
+            phone?: string | null;
+            /** Project Ids */
+            project_ids?: string[];
+            /** Referral Fee Disclosure Ar */
+            referral_fee_disclosure_ar?: string | null;
+            /** Referral Fee Disclosure En */
+            referral_fee_disclosure_en?: string | null;
+            /** Website */
+            website?: string | null;
+        };
+        /** ProviderOut */
+        ProviderOut: {
+            category: components["schemas"]["ServiceCategory"];
+            /** Description Ar */
+            description_ar: string;
+            /** Description En */
+            description_en: string;
+            /** Email */
+            email: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** License Number */
+            license_number: string | null;
+            /** Name Ar */
+            name_ar: string;
+            /** Name En */
+            name_en: string;
+            /** Phone */
+            phone: string | null;
+            /** Project Ids */
+            project_ids: string[];
+            /** Referral Fee Disclosure Ar */
+            referral_fee_disclosure_ar: string | null;
+            /** Referral Fee Disclosure En */
+            referral_fee_disclosure_en: string | null;
+            /** Verified */
+            verified: boolean;
+            /** Website */
+            website: string | null;
+        };
+        /** ProviderPatch */
+        ProviderPatch: {
+            category?: components["schemas"]["ServiceCategory"] | null;
+            /** Description Ar */
+            description_ar?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** License Number */
+            license_number?: string | null;
+            /** Name Ar */
+            name_ar?: string | null;
+            /** Name En */
+            name_en?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Project Ids */
+            project_ids?: string[] | null;
+            /** Referral Fee Disclosure Ar */
+            referral_fee_disclosure_ar?: string | null;
+            /** Referral Fee Disclosure En */
+            referral_fee_disclosure_en?: string | null;
+            /** Verified */
+            verified?: boolean | null;
+            /** Website */
+            website?: string | null;
+        };
         /** QueueClaim */
         QueueClaim: {
             /** Area Sqm */
@@ -3124,6 +3433,65 @@ export interface components {
             user_id: string;
             /** User Name */
             user_name: string;
+        };
+        /** ReferralIn */
+        ReferralIn: {
+            /**
+             * Acknowledged Disclosure
+             * @default false
+             */
+            acknowledged_disclosure: boolean;
+            /** Deal Id */
+            deal_id?: string | null;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Provider Id
+             * Format: uuid
+             */
+            provider_id: string;
+            /**
+             * Share Phone
+             * @default false
+             */
+            share_phone: boolean;
+        };
+        /** ReferralOut */
+        ReferralOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deal Id */
+            deal_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Message */
+            message: string;
+            provider: components["schemas"]["ProviderOut"];
+            /** Share Phone */
+            share_phone: boolean;
+            status: components["schemas"]["ReferralStatus"];
+        };
+        /**
+         * ReferralStatus
+         * @enum {string}
+         */
+        ReferralStatus: "requested" | "contacted" | "completed" | "cancelled";
+        /** ReferralStatusIn */
+        ReferralStatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "contacted" | "completed" | "cancelled";
         };
         /** RefreshIn */
         RefreshIn: {
@@ -3508,6 +3876,11 @@ export interface components {
             /** Safety Tip */
             safety_tip?: string | null;
         };
+        /**
+         * ServiceCategory
+         * @enum {string}
+         */
+        ServiceCategory: "lawyer" | "notary_services" | "surveyor" | "mover" | "maintenance" | "interior" | "cleaning";
         /** SignedUrlOut */
         SignedUrlOut: {
             /** Expires At */
@@ -3526,6 +3899,22 @@ export interface components {
             phone: string;
             /** Resend After Seconds */
             resend_after_seconds: number;
+        };
+        /** SuggestionsOut */
+        SuggestionsOut: {
+            /** Categories */
+            categories: components["schemas"]["ServiceCategory"][];
+            /**
+             * Deal Id
+             * Format: uuid
+             */
+            deal_id: string;
+            /**
+             * Note
+             * @default Independent professionals. Darna is not a party to their services; agree terms directly with them.
+             */
+            note: string;
+            status: components["schemas"]["DealStatus"];
         };
         /**
          * SupportCategory
@@ -4022,6 +4411,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpireOut"];
+                };
+            };
+        };
+    };
+    admin_providers_admin_services_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProviderOut"][];
+                };
+            };
+        };
+    };
+    create_provider_admin_services_providers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_admin_services_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_referrals_admin_services_referrals_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ReferralStatus"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReferralOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_referral_admin_services_referrals__referral_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                referral_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferralStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReferralOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6223,6 +6766,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ListingCard_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    providers_services_providers_get: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["ServiceCategory"] | null;
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_referrals_services_referrals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferralOut"][];
+                };
+            };
+        };
+    };
+    request_referral_services_referrals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferralIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferralOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_referral_services_referrals__referral_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                referral_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferralOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_services_suggestions_get: {
+        parameters: {
+            query: {
+                deal_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionsOut"];
                 };
             };
             /** @description Validation Error */

@@ -224,3 +224,20 @@ class SupportStatus(StrEnum):
     in_progress = "in_progress"
     resolved = "resolved"
     closed = "closed"
+
+
+class ServiceCategory(StrEnum):
+    lawyer = "lawyer"                  # contract review, registration, due diligence
+    notary_services = "notary_services"  # help with notarization / real-estate registry paperwork
+    surveyor = "surveyor"              # property inspection, area measurement
+    mover = "mover"
+    maintenance = "maintenance"        # handyman, AC, plumbing
+    interior = "interior"              # finishing and interior works
+    cleaning = "cleaning"
+
+
+class ReferralStatus(StrEnum):
+    requested = "requested"
+    contacted = "contacted"   # provider reports they contacted the user
+    completed = "completed"
+    cancelled = "cancelled"
