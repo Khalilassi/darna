@@ -14,7 +14,7 @@ import {
   Badge, Button, Card, Divider, ErrorState, Icon, IconButton, KeyValue, LoadingState, Notice, PriceBreakdown, Row, Section, T, TextField,
 } from "../../src/components";
 import { mediaUrl } from "../../src/config";
-import { formatArea, formatDate, formatMoney, formatNumber, formatPercent, parseAmountInput } from "../../src/i18n/format";
+import { formatArea, formatDate, formatMoney, formatNumber, formatPercent, localizeDigits, parseAmountInput } from "../../src/i18n/format";
 import { useLanguage } from "../../src/i18n/LanguageProvider";
 import { useCompare } from "../../src/state/compare";
 import { useTheme } from "../../src/theme";
@@ -220,7 +220,7 @@ function ListingView({ l, refetch }: { l: Detail; refetch: () => void }) {
             <T variant="title">{l.title}</T>
             <Row>
               <Icon name="location-outline" size={16} color={colors.textMuted} />
-              <T tone="muted" style={{ flex: 1 }}>{`${district} · ${t("listing.group", { code: l.group_code })} · ${project}`}</T>
+              <T tone="muted" style={{ flex: 1 }}>{`${district} · ${t("listing.group", { code: localizeDigits(l.group_code, lang) })} · ${project}`}</T>
             </Row>
             <Row wrap>
               {l.owner_verified ? (

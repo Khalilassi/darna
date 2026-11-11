@@ -30,6 +30,10 @@ export function initI18n(lang: Language) {
       returnNull: false,
       initImmediate: false,
     } as Parameters<typeof i18next.init>[0]);
+    // `{{count, number}}`: Arabic uses ar-EG so counts render with Arabic-Indic digits (plain "ar" may use Latin digits).
+    i18next.services.formatter?.add("number", (value, lng) =>
+      new Intl.NumberFormat(lng === "ar" ? "ar-EG" : "en-US").format(Number(value)),
+    );
   } else if (i18next.language !== lang) {
     void i18next.changeLanguage(lang);
   }
