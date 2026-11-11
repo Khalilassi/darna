@@ -2338,6 +2338,11 @@
      "delivery_status": {
       "$ref": "#/components/schemas/DeliveryStatus"
      },
+     "district_id": {
+      "format": "uuid",
+      "title": "District Id",
+      "type": "string"
+     },
      "district_name_ar": {
       "title": "District Name Ar",
       "type": "string"
@@ -2515,6 +2520,7 @@
      "project_id",
      "project_name_en",
      "project_name_ar",
+     "district_id",
      "district_name_en",
      "district_name_ar",
      "group_code",
@@ -2572,6 +2578,11 @@
      },
      "description": {
       "title": "Description",
+      "type": "string"
+     },
+     "district_id": {
+      "format": "uuid",
+      "title": "District Id",
       "type": "string"
      },
      "district_name_ar": {
@@ -2831,6 +2842,7 @@
      "project_id",
      "project_name_en",
      "project_name_ar",
+     "district_id",
      "district_name_en",
      "district_name_ar",
      "group_code",
@@ -3063,7 +3075,6 @@
       "type": "string"
      },
      "methodology": {
-      "default": "Based on asking prices of listings published on Darna, not valuations or completed transaction prices. Sale figures use each listing's known total cost (cash price plus remaining installments and known fees) divided by area. Groups with fewer than 3 listings are hidden to protect owners' privacy.",
       "title": "Methodology",
       "type": "string"
      },
@@ -3106,6 +3117,7 @@
      "property_types",
      "districts",
      "trend",
+     "methodology",
      "generated_at"
     ],
     "title": "MarketSummary",
@@ -3170,6 +3182,18 @@
       ],
       "title": "Phone"
      },
+     "phone_verified_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone Verified At"
+     },
      "role": {
       "$ref": "#/components/schemas/Role"
      },
@@ -3185,6 +3209,7 @@
      "locale",
      "role",
      "identity_verified_at",
+     "phone_verified_at",
      "mfa_enabled_at",
      "created_at",
      "verification"
@@ -3251,6 +3276,18 @@
       ],
       "title": "Phone"
      },
+     "phone_verified_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone Verified At"
+     },
      "role": {
       "$ref": "#/components/schemas/Role"
      }
@@ -3263,6 +3300,7 @@
      "locale",
      "role",
      "identity_verified_at",
+     "phone_verified_at",
      "mfa_enabled_at",
      "created_at"
     ],
@@ -3908,6 +3946,11 @@
       "title": "Description",
       "type": "string"
      },
+     "district_id": {
+      "format": "uuid",
+      "title": "District Id",
+      "type": "string"
+     },
      "district_name_ar": {
       "title": "District Name Ar",
       "type": "string"
@@ -4209,6 +4252,7 @@
      "project_id",
      "project_name_en",
      "project_name_ar",
+     "district_id",
      "district_name_en",
      "district_name_ar",
      "group_code",
@@ -6403,25 +6447,28 @@
     "title": "SignedUrlOut",
     "type": "object"
    },
-   "StartIn": {
+   "StartOut": {
     "properties": {
-     "listing_id": {
-      "format": "uuid",
-      "title": "Listing Id",
+     "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
       "type": "string"
      },
-     "message": {
-      "maxLength": 2000,
-      "minLength": 1,
-      "title": "Message",
+     "phone": {
+      "title": "Phone",
       "type": "string"
+     },
+     "resend_after_seconds": {
+      "title": "Resend After Seconds",
+      "type": "integer"
      }
     },
     "required": [
-     "listing_id",
-     "message"
+     "phone",
+     "expires_at",
+     "resend_after_seconds"
     ],
-    "title": "StartIn",
+    "title": "StartOut",
     "type": "object"
    },
    "SupportCategory": {
@@ -6753,6 +6800,20 @@
     "title": "VerificationSummary",
     "type": "object"
    },
+   "VerifyIn": {
+    "properties": {
+     "code": {
+      "pattern": "^[0-9]{6}$",
+      "title": "Code",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code"
+    ],
+    "title": "VerifyIn",
+    "type": "object"
+   },
    "ViewingAction": {
     "properties": {
      "action": {
@@ -6945,6 +7006,41 @@
      "my_role"
     ],
     "title": "ViewingWithListing",
+    "type": "object"
+   },
+   "app__modules__messaging__StartIn": {
+    "properties": {
+     "listing_id": {
+      "format": "uuid",
+      "title": "Listing Id",
+      "type": "string"
+     },
+     "message": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+     }
+    },
+    "required": [
+     "listing_id",
+     "message"
+    ],
+    "title": "StartIn",
+    "type": "object"
+   },
+   "app__modules__phone__StartIn": {
+    "properties": {
+     "phone": {
+      "maxLength": 32,
+      "title": "Phone",
+      "type": "string"
+     }
+    },
+    "required": [
+     "phone"
+    ],
+    "title": "StartIn",
     "type": "object"
    }
   },
@@ -8105,6 +8201,98 @@
     ]
    }
   },
+  "/auth/phone/start": {
+   "post": {
+    "operationId": "start_auth_phone_start_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/app__modules__phone__StartIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StartOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Start",
+    "tags": [
+     "me"
+    ]
+   }
+  },
+  "/auth/phone/verify": {
+   "post": {
+    "operationId": "verify_auth_phone_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VerifyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Verify",
+    "tags": [
+     "me"
+    ]
+   }
+  },
   "/auth/refresh": {
    "post": {
     "operationId": "refresh_auth_refresh_post",
@@ -8222,7 +8410,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/StartIn"
+        "$ref": "#/components/schemas/app__modules__messaging__StartIn"
        }
       }
      },

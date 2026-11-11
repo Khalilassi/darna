@@ -16,7 +16,7 @@ from app.core import rate_limit
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
-from app.core.deps import client_ip, current_user, current_user_optional
+from app.core.deps import client_ip, current_user, current_user_optional, request_lang
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.scanning import ensure_clean
 from app.core.state_machine import StateMachine
@@ -141,6 +141,7 @@ class ListingCard(BaseModel):
     project_id: uuid.UUID
     project_name_en: str
     project_name_ar: str
+    district_id: uuid.UUID
     district_name_en: str
     district_name_ar: str
     group_code: str
@@ -260,7 +261,7 @@ def _card(listing: Listing) -> dict:
     return dict(
         id=listing.id, title=listing.title, purpose=listing.purpose, status=listing.status,
         project_id=prop.project_id, project_name_en=prop.project.name_en, project_name_ar=prop.project.name_ar,
-        district_name_en=prop.district.name_en, district_name_ar=prop.district.name_ar, group_code=prop.group_code,
+        district_id=prop.district_id, district_name_en=prop.district.name_en, district_name_ar=prop.district.name_ar, group_code=prop.group_code,
         property_type=prop.property_type, area_sqm=prop.area_sqm, bedrooms=prop.bedrooms, bathrooms=prop.bathrooms,
         floor=prop.floor, finishing=prop.finishing, delivery_status=prop.delivery_status, orientation=prop.orientation,
         furnished=listing.furnished, cover_photo_url=public_storage().url(cover.storage_key) if cover else None,
@@ -685,14 +686,14 @@ class ScenarioOut(BaseModel):
 
 
 @router.get("/{listing_id}/financials", response_model=ScenarioOut)
-def financial_scenario(listing_id: uuid.UUID, as_of: date | None = None, discount_rate: Decimal | None = Query(default=None, ge=0, le=1), db: Session = Depends(get_db)):
+def financial_scenario(request: Request, listing_id: uuid.UUID, as_of: date | None = None, discount_rate: Decimal | None = Query(default=None, ge=0, le=1), db: Session = Depends(get_db)):
     listing = _load(db, listing_id)
     if listing.status not in LISTING_PUBLIC_STATUSES or not listing.sale_terms:
         raise NotFound("No sale financials for this listing")
     as_of = as_of or date.today()
     sale = _sale_input(listing, listing.property)
     assert sale is not None
-    pv = present_value(sale.installments, as_of, discount_rate) if discount_rate is not None else None
+    pv = present_value(sale.installments, as_of, discount_rate, request_lang(request)) if discount_rate is not None else None
     return ScenarioOut(sale_breakdown=compute_sale(sale, as_of), present_value=pv)
 
 

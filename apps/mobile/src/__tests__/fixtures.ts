@@ -8,6 +8,7 @@ export const card: Schemas["ListingCard"] = {
   project_id: "p1",
   project_name_en: "Madinaty",
   project_name_ar: "مدينتي",
+  district_id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
   district_name_en: "B7",
   district_name_ar: "بي ٧",
   group_code: "72",

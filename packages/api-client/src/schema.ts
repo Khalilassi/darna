@@ -368,6 +368,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/phone/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_auth_phone_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/phone/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify */
+        post: operations["verify_auth_phone_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -2136,6 +2170,11 @@ export interface components {
             /** Cover Photo Url */
             cover_photo_url: string | null;
             delivery_status: components["schemas"]["DeliveryStatus"];
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -2201,6 +2240,11 @@ export interface components {
             delivery_status: components["schemas"]["DeliveryStatus"];
             /** Description */
             description: string;
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -2339,10 +2383,7 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
-            /**
-             * Methodology
-             * @default Based on asking prices of listings published on Darna, not valuations or completed transaction prices. Sale figures use each listing's known total cost (cash price plus remaining installments and known fees) divided by area. Groups with fewer than 3 listings are hidden to protect owners' privacy.
-             */
+            /** Methodology */
             methodology: string;
             /**
              * Min Sample
@@ -2388,6 +2429,8 @@ export interface components {
             mfa_enabled_at: string | null;
             /** Phone */
             phone: string | null;
+            /** Phone Verified At */
+            phone_verified_at: string | null;
             role: components["schemas"]["Role"];
             verification: components["schemas"]["VerificationSummary"];
         };
@@ -2415,6 +2458,8 @@ export interface components {
             mfa_enabled_at: string | null;
             /** Phone */
             phone: string | null;
+            /** Phone Verified At */
+            phone_verified_at: string | null;
             role: components["schemas"]["Role"];
         };
         /** MeUpdate */
@@ -2631,6 +2676,11 @@ export interface components {
             delivery_status: components["schemas"]["DeliveryStatus"];
             /** Description */
             description: string;
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -3391,15 +3441,17 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** StartIn */
-        StartIn: {
+        /** StartOut */
+        StartOut: {
             /**
-             * Listing Id
-             * Format: uuid
+             * Expires At
+             * Format: date-time
              */
-            listing_id: string;
-            /** Message */
-            message: string;
+            expires_at: string;
+            /** Phone */
+            phone: string;
+            /** Resend After Seconds */
+            resend_after_seconds: number;
         };
         /**
          * SupportCategory
@@ -3508,6 +3560,11 @@ export interface components {
             /** Pending Ownership Claims */
             pending_ownership_claims: number;
         };
+        /** VerifyIn */
+        VerifyIn: {
+            /** Code */
+            code: string;
+        };
         /** ViewingAction */
         ViewingAction: {
             /**
@@ -3611,6 +3668,21 @@ export interface components {
              */
             requester_id: string;
             status: components["schemas"]["ViewingStatus"];
+        };
+        /** StartIn */
+        app__modules__messaging__StartIn: {
+            /**
+             * Listing Id
+             * Format: uuid
+             */
+            listing_id: string;
+            /** Message */
+            message: string;
+        };
+        /** StartIn */
+        app__modules__phone__StartIn: {
+            /** Phone */
+            phone: string;
         };
     };
     responses: never;
@@ -4286,6 +4358,72 @@ export interface operations {
             };
         };
     };
+    start_auth_phone_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__phone__StartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_auth_phone_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_auth_refresh_post: {
         parameters: {
             query?: never;
@@ -4381,7 +4519,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StartIn"];
+                "application/json": components["schemas"]["app__modules__messaging__StartIn"];
             };
         };
         responses: {

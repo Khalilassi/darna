@@ -21,7 +21,13 @@ _Last updated: 2026-11-11. Future sessions: read this first, then `README.md` an
 | Notifications (in-app), support cases incl. broker reports | ✅ | ✅ | ✅ | – |
 | Push notifications: device registration, per-category preferences, Expo adapter (off by default) | ✅ | ✅ registration, deep links, settings screen | – | – |
 | Staff two-factor sign-in (TOTP, replay-protected, optional enforcement) | ✅ | – | ✅ QR enrollment, login code step, banner | – |
-| Scheduled worker: offer expiry, document retention purge, featured expiry, token cleanup | ✅ (`python -m app.worker`) | – | – | – |
+| Scheduled worker: offer expiry, document retention purge, featured expiry, saved-search alerts, token cleanup | ✅ (`python -m app.worker`) | – | – | – |
+| Market insights: asking-price history, district price/m² (groups < 3 hidden), monthly trend | ✅ | ✅ market screen, price history | – | – |
+| Cash vs installments comparison (break-even cash price at a chosen rate) | ✅ | ✅ | – | – |
+| Saved searches + new-listing alerts | ✅ | ✅ save, list, results, alerts switch | – | – |
+| Phone verification by SMS code (dev SMS sender only) | ✅ | ✅ verify screen + status badge | – | – |
+| Account lockout after repeated failed sign-ins | ✅ | ✅ message with minutes left | ✅ (shared API) | – |
+| S3-compatible storage, key rotation, ClamAV upload scanning, Redis rate limiting | ✅ | – | – | – |
 | Audit log, analytics, user management (roles, suspension) | ✅ | – | ✅ | – |
 | EN/AR + RTL, EGP formatting, light/dark | – | ✅ | – | ✅ |
 | Public marketing site, SEO (metadata, sitemap, robots, hreflang) | – | – | – | ✅ |
@@ -34,10 +40,10 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 
 | Check | Result |
 |---|---|
-| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests) | **102 passed** |
+| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **144 passed** |
 | `services/api`: `ruff check .` | pass |
 | `services/api`: `alembic upgrade head` + `alembic check` (models match migrations) | pass |
-| `apps/mobile`: `tsc --noEmit` / `jest` | pass / **37 passed** (7 suites) |
+| `apps/mobile`: `tsc --noEmit` / `jest` | pass / **59 passed** (11 suites) |
 | `apps/mobile`: `expo export --platform web` (lead re-ran) and `--platform android` (agent run) | pass (`EXPO_OFFLINE=1`, Expo API blocked by network) |
 | `apps/admin`: typecheck / vitest / `next build` | pass / **29 passed** / pass |
 | `apps/web`: typecheck / vitest / `next build` | pass / **11 passed** / pass |
@@ -45,6 +51,8 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 | Playwright smoke against live API: mobile web journeys, admin (12 checks), web (24 checks) | pass (run by the build agents; scripts in each app) |
 | Playwright: admin two-factor enrollment → sign-out → code step → replay rejected → sign-in (real TOTP codes) | pass |
 | Playwright: mobile notification settings persist; web date field | pass |
+| Playwright: mobile market insights, cash-vs-installments, saved search; phone verification with a real code from the dev SMS log | pass |
+| Redis rate limiter against a real Redis 7.0 server (two clients share one limit) | pass |
 | Docker image / docker-compose | **not run** (no Docker daemon in this environment) |
 | GitHub Actions CI (`api` + `js` jobs) | **green** on `995192f`; earlier WIP snapshot commits failed as expected |
 | Native iOS/Android device or emulator runs | **not run**; no APK/IPA has been produced |
@@ -62,15 +70,17 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - The dev database used during this session contains extra test records from agent E2E runs; reset with `python seed.py --reset`.
 
 ## Next implementation tasks (priority order) — see `docs/BACKLOG.md`
-1. Build and run the Docker image (compose now includes a `worker` service).
+1. Build and run the Docker image (compose includes `worker`; add `clamd` and `redis` services for production parity).
 2. Native QA on Android emulator + iOS simulator; EAS project + development builds; verify push end to end.
-3. Object storage adapter (S3-compatible with SSE) for documents and photos; KMS-managed keys.
-4. Malware scanning on uploads; Redis-backed rate limiting; account lockout policy.
-5. Price history & price-per-m² analytics; cash-vs-installment comparison scenario.
-6. Phone verification (SMS/OTP adapter); saved searches & alerts; map view.
-7. Optional paid services (featured listings purchase flow) through a licensed payment provider adapter.
+3. Integrate a real SMS provider (implement `SmsSender` in `app/core/sms.py`).
+4. Map view (needs property coordinates or district geometry, and a map tiles provider).
+5. Optional paid services (featured listings purchase flow) through a licensed payment provider adapter.
 
 ## Required external configuration / dependencies
+- Production storage: `DARNA_STORAGE_BACKEND=s3`, two buckets (private documents, public photos), `DARNA_MEDIA_BASE_URL`, optional KMS key.
+- ClamAV daemon (`DARNA_MALWARE_SCANNER=clamd`) — production refuses to start without a scanner.
+- Redis for shared rate limiting when running more than one API instance.
+- An SMS provider contract + credentials for phone verification.
 - Production secrets: `DARNA_JWT_SECRET`, `DARNA_DOCUMENT_ENCRYPTION_KEY` (app refuses to start in staging/production without them), `DARNA_DATABASE_URL`, `DARNA_PUBLIC_BASE_URL`, `DARNA_CORS_ORIGINS`.
 - Expo/EAS account; Apple Developer Program (bundle id `com.darna.app` placeholder, certificates/profiles); Google Play Console + upload keystore.
 - Push: set `DARNA_PUSH_PROVIDER=expo` (optional `DARNA_EXPO_ACCESS_TOKEN`); real device delivery also needs FCM/APNs credentials in the Expo project. SMS provider — not integrated.

@@ -300,7 +300,7 @@ class PresentValue(BaseModel):
     assumption: str
 
 
-def present_value(installments: list[Installment], as_of: date, annual_rate: Decimal) -> PresentValue:
+def present_value(installments: list[Installment], as_of: date, annual_rate: Decimal, lang: str = "en") -> PresentValue:
     """Discount future installments at a user-supplied annual rate (daily compounding, ACT/365).
 
     This is a scenario estimate, never a statement of fact; the assumption is returned with it.
@@ -321,8 +321,13 @@ def present_value(installments: list[Installment], as_of: date, annual_rate: Dec
         nominal_future=q(nominal),
         present_value=q(pv),
         saving_vs_nominal=q(nominal - pv),
-        assumption=f"Future installments discounted at {annual_rate * 100:.2f}% per year (user-supplied rate), "
-        "annual compounding by day count/365. Overdue installments are excluded.",
+        assumption=(
+            f"الأقساط المستقبلية مخصومة بمعدل {annual_rate * 100:.2f}% سنويًا (معدل اخترته أنت)، بحساب الأيام على أساس 365 يومًا. "
+            "الأقساط المتأخرة غير مشمولة."
+            if lang == "ar" else
+            f"Future installments discounted at {annual_rate * 100:.2f}% per year (user-supplied rate), "
+            "annual compounding by day count/365. Overdue installments are excluded."
+        ),
     )
 
 
@@ -424,7 +429,7 @@ class CashComparison(BaseModel):
 
 
 def compare_cash_vs_installments(
-    inp: SaleInput, as_of: date, annual_rate: Decimal, cash_alternative: Decimal | None = None
+    inp: SaleInput, as_of: date, annual_rate: Decimal, cash_alternative: Decimal | None = None, lang: str = "en"
 ) -> CashComparison:
     """Compare paying this listing's installment plan with paying a single cash amount today.
 
@@ -432,7 +437,7 @@ def compare_cash_vs_installments(
     change which option is cheaper unless they differ between options — they don't here).
     """
     breakdown = compute_sale(inp, as_of)
-    pv = present_value(inp.installments, as_of, annual_rate)
+    pv = present_value(inp.installments, as_of, annual_rate, lang)
     pv_total = breakdown.initial_cash_required + pv.present_value
     cheaper = diff = None
     if cash_alternative is not None:
@@ -451,6 +456,10 @@ def compare_cash_vs_installments(
         present_value_difference=diff,
         excludes_estimates_and_unknowns=bool(breakdown.estimated_extra or breakdown.unconfirmed),
         assumption=(
+            f"الأقساط المستقبلية مخصومة بمعدل {annual_rate * 100:.2f}% سنويًا (معدل اخترته أنت، مثل ما يمكن أن تكسبه أموالك "
+            "أو تكلفة الاقتراض). دفع سعر التعادل نقدًا اليوم يكلف نفس تكلفة خطة الأقساط بقيمة أموال اليوم. "
+            "المبالغ المعروفة فقط؛ التقديرات والرسوم غير المؤكدة غير مشمولة."
+            if lang == "ar" else
             f"Future installments are discounted at {annual_rate * 100:.2f}% per year (a rate you chose, e.g. what your "
             "money could earn or what borrowing costs you). Paying the break-even cash price today costs the same as the "
             "installment plan in today's money. Known amounts only; estimates and unconfirmed fees are not included."

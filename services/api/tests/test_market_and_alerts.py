@@ -137,3 +137,18 @@ def test_lockout_does_not_reveal_unknown_accounts(client):
     assert codes == [401] * 8 + [429]
 
 
+
+
+def test_arabic_explanations_and_district_id(make_user, project, reviewer, client):
+    owner = make_user(verified=True)
+    lid = publish_listing(owner, reviewer, project)
+    card = client.get("/listings").json()["items"][0]
+    assert card["district_id"] == str(project["districts"][0])
+    ar = {"Accept-Language": "ar-EG,ar;q=0.9"}
+    s = client.get("/market/summary", params={"project_id": str(project["id"])}, headers=ar).json()
+    assert "دارنا" in s["methodology"]
+    assert "Darna" in client.get("/market/summary", params={"project_id": str(project["id"])}).json()["methodology"]
+    c = client.get(f"/listings/{lid}/financials/compare", params={"discount_rate": "0.2"}, headers=ar).json()
+    assert "20.00%" in c["assumption"] and "سنويًا" in c["assumption"]
+    pv = client.get(f"/listings/{lid}/financials", params={"discount_rate": "0.2"}, headers=ar).json()["present_value"]
+    assert "سنويًا" in pv["assumption"]

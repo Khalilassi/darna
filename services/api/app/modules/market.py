@@ -13,12 +13,13 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db, utcnow
+from app.core.deps import request_lang
 from app.core.errors import NotFound, ValidationFailed
 from app.finance.engine import CashComparison, compare_cash_vs_installments
 from app.models.entities import District, Listing, ListingPriceEvent, Property
@@ -32,6 +33,11 @@ METHODOLOGY = (
     "Based on asking prices of listings published on Darna, not valuations or completed transaction prices. "
     "Sale figures use each listing's known total cost (cash price plus remaining installments and known fees) "
     "divided by area. Groups with fewer than 3 listings are hidden to protect owners' privacy."
+)
+METHODOLOGY_AR = (
+    "مبنية على أسعار الطلب للإعلانات المنشورة على دارنا، وليست تقييمات أو أسعار صفقات منجزة. "
+    "أرقام البيع تستخدم التكلفة الإجمالية المعروفة لكل إعلان (السعر النقدي مع الأقساط المتبقية والرسوم المعروفة) "
+    "مقسومة على المساحة. تُخفى المجموعات التي تضم أقل من 3 إعلانات لحماية خصوصية الملاك."
 )
 
 
@@ -102,7 +108,7 @@ class MarketSummary(BaseModel):
     districts: list[DistrictSummary]
     trend: list[TrendPoint]
     min_sample: int = MIN_SAMPLE
-    methodology: str = METHODOLOGY
+    methodology: str
     generated_at: datetime
 
 
@@ -116,6 +122,7 @@ def _q2(v) -> Decimal | None:
 
 @router.get("/market/summary", response_model=MarketSummary)
 def market_summary(
+    request: Request,
     project_id: uuid.UUID,
     purpose: Literal["sale", "rent"] = "sale",
     district_id: uuid.UUID | None = None,
@@ -170,12 +177,12 @@ def market_summary(
     ).all()
     trend = [TrendPoint(month=m, sample_size=n, median_per_sqm=_q2(med) if n >= MIN_SAMPLE else None) for m, n, med in trend_rows]
     return MarketSummary(project_id=project_id, purpose=purpose, property_types=property_type, districts=out, trend=trend,
-                         generated_at=utcnow())
+                         methodology=METHODOLOGY_AR if request_lang(request) == "ar" else METHODOLOGY, generated_at=utcnow())
 
 
 # --------------------------------------------------------------------------- cash vs installments
 @router.get("/listings/{listing_id}/financials/compare", response_model=CashComparison)
-def compare(listing_id: uuid.UUID, discount_rate: Decimal = Query(ge=0, le=1), cash_price: Decimal | None = Query(default=None, gt=0),
+def compare(request: Request, listing_id: uuid.UUID, discount_rate: Decimal = Query(ge=0, le=1), cash_price: Decimal | None = Query(default=None, gt=0),
             as_of: date | None = None, db: Session = Depends(get_db)):
     from app.modules.listings import _load, _sale_input
 
@@ -186,4 +193,4 @@ def compare(listing_id: uuid.UUID, discount_rate: Decimal = Query(ge=0, le=1), c
     assert sale is not None
     if sale.payment_mode != PaymentMode.installments:
         raise ValidationFailed("This listing is a cash sale; there is no installment plan to compare", code="not_installment_sale")
-    return compare_cash_vs_installments(sale, as_of or date.today(), discount_rate, cash_price)
+    return compare_cash_vs_installments(sale, as_of or date.today(), discount_rate, cash_price, request_lang(request))
