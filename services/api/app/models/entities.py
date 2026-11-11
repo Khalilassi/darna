@@ -445,6 +445,51 @@ class SupportCase(IdMixin, TimestampMixin, Base):
     resolution_note: Mapped[str | None] = mapped_column(Text)
 
 
+class ListingPriceEvent(IdMixin, Base):
+    """Asking-price history. Written when a listing goes live and whenever a live listing's price changes.
+
+    ``closed`` events (sold/rented) carry no amount: agreed prices are private to the parties and are
+    never exposed, not even in aggregates.
+    """
+
+    __tablename__ = "listing_price_events"
+    __table_args__ = (Index("ix_price_events_district_time", "district_id", "created_at"),)
+    listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), index=True)
+    property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    district_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("districts.id"))
+    property_type: Mapped[PropertyType] = mapped_column(E(PropertyType, "property_type"))
+    area_sqm: Mapped[Decimal] = mapped_column(Numeric(8, 2))
+    kind: Mapped[str] = mapped_column(String(20))  # listed | price_changed | closed
+    sale_cash_price: Mapped[Decimal | None] = mapped_column(Money)
+    sale_known_total: Mapped[Decimal | None] = mapped_column(Money)
+    monthly_rent: Mapped[Decimal | None] = mapped_column(Money)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SavedSearch(IdMixin, TimestampMixin, Base):
+    __tablename__ = "saved_searches"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    filters: Mapped[dict] = mapped_column(Json, default=dict)
+    alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Listings published after this instant are "new" for alerts.
+    last_alerted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class LoginThrottle(Base):
+    """Per-account failed-login counter, keyed by a hash of the normalized email.
+
+    Tracked for unknown emails too, so lockout behaviour never reveals whether an account exists.
+    """
+
+    __tablename__ = "login_throttles"
+    email_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class IdempotencyRecord(Base):
     __tablename__ = "idempotency_records"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)

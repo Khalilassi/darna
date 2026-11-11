@@ -793,6 +793,100 @@
     "title": "CaseUpdate",
     "type": "object"
    },
+   "CashComparison": {
+    "properties": {
+     "annual_discount_rate": {
+      "title": "Annual Discount Rate",
+      "type": "string"
+     },
+     "assumption": {
+      "title": "Assumption",
+      "type": "string"
+     },
+     "break_even_cash_price": {
+      "title": "Break Even Cash Price",
+      "type": "string"
+     },
+     "cash_alternative": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash Alternative"
+     },
+     "cheaper_option": {
+      "anyOf": [
+       {
+        "enum": [
+         "installments",
+         "cash",
+         "equal"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cheaper Option"
+     },
+     "excludes_estimates_and_unknowns": {
+      "title": "Excludes Estimates And Unknowns",
+      "type": "boolean"
+     },
+     "future_nominal": {
+      "title": "Future Nominal",
+      "type": "string"
+     },
+     "future_present_value": {
+      "title": "Future Present Value",
+      "type": "string"
+     },
+     "initial_cash": {
+      "title": "Initial Cash",
+      "type": "string"
+     },
+     "nominal_total": {
+      "title": "Nominal Total",
+      "type": "string"
+     },
+     "present_value_difference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Present Value Difference"
+     },
+     "present_value_total": {
+      "title": "Present Value Total",
+      "type": "string"
+     }
+    },
+    "required": [
+     "annual_discount_rate",
+     "initial_cash",
+     "future_nominal",
+     "future_present_value",
+     "nominal_total",
+     "present_value_total",
+     "break_even_cash_price",
+     "cash_alternative",
+     "cheaper_option",
+     "present_value_difference",
+     "excludes_estimates_and_unknowns",
+     "assumption"
+    ],
+    "title": "CashComparison",
+    "type": "object"
+   },
    "ChecklistOut": {
     "properties": {
      "code": {
@@ -1605,6 +1699,43 @@
     "title": "DistrictOut",
     "type": "object"
    },
+   "DistrictSummary": {
+    "properties": {
+     "active_listings": {
+      "title": "Active Listings",
+      "type": "integer"
+     },
+     "district_id": {
+      "format": "uuid",
+      "title": "District Id",
+      "type": "string"
+     },
+     "district_name_ar": {
+      "title": "District Name Ar",
+      "type": "string"
+     },
+     "district_name_en": {
+      "title": "District Name En",
+      "type": "string"
+     },
+     "rent": {
+      "$ref": "#/components/schemas/Figure"
+     },
+     "sale": {
+      "$ref": "#/components/schemas/Figure"
+     }
+    },
+    "required": [
+     "district_id",
+     "district_name_en",
+     "district_name_ar",
+     "active_listings",
+     "sale",
+     "rent"
+    ],
+    "title": "DistrictSummary",
+    "type": "object"
+   },
    "DocRef": {
     "properties": {
      "content_type": {
@@ -1856,6 +1987,31 @@
      "value"
     ],
     "title": "Fee",
+    "type": "object"
+   },
+   "Figure": {
+    "properties": {
+     "median_per_sqm": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median Per Sqm"
+     },
+     "sample_size": {
+      "title": "Sample Size",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "sample_size",
+     "median_per_sqm"
+    ],
+    "title": "Figure",
     "type": "object"
    },
    "FinancialVerificationIn": {
@@ -2890,6 +3046,69 @@
      "password"
     ],
     "title": "LoginIn",
+    "type": "object"
+   },
+   "MarketSummary": {
+    "properties": {
+     "districts": {
+      "items": {
+       "$ref": "#/components/schemas/DistrictSummary"
+      },
+      "title": "Districts",
+      "type": "array"
+     },
+     "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+     },
+     "methodology": {
+      "default": "Based on asking prices of listings published on Darna, not valuations or completed transaction prices. Sale figures use each listing's known total cost (cash price plus remaining installments and known fees) divided by area. Groups with fewer than 3 listings are hidden to protect owners' privacy.",
+      "title": "Methodology",
+      "type": "string"
+     },
+     "min_sample": {
+      "default": 3,
+      "title": "Min Sample",
+      "type": "integer"
+     },
+     "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+     },
+     "property_types": {
+      "items": {
+       "$ref": "#/components/schemas/PropertyType"
+      },
+      "title": "Property Types",
+      "type": "array"
+     },
+     "purpose": {
+      "enum": [
+       "sale",
+       "rent"
+      ],
+      "title": "Purpose",
+      "type": "string"
+     },
+     "trend": {
+      "items": {
+       "$ref": "#/components/schemas/TrendPoint"
+      },
+      "title": "Trend",
+      "type": "array"
+     }
+    },
+    "required": [
+     "project_id",
+     "purpose",
+     "property_types",
+     "districts",
+     "trend",
+     "generated_at"
+    ],
+    "title": "MarketSummary",
     "type": "object"
    },
    "MeDetailOut": {
@@ -4323,6 +4542,61 @@
     "title": "PresentValue",
     "type": "object"
    },
+   "PricePoint": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "monthly_rent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Rent"
+     },
+     "sale_cash_price": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sale Cash Price"
+     },
+     "sale_known_total": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sale Known Total"
+     }
+    },
+    "required": [
+     "kind",
+     "sale_cash_price",
+     "sale_known_total",
+     "monthly_rent",
+     "created_at"
+    ],
+    "title": "PricePoint",
+    "type": "object"
+   },
    "ProjectOut": {
     "properties": {
      "city_ar": {
@@ -5464,6 +5738,109 @@
     "title": "SaleTermsIn",
     "type": "object"
    },
+   "SavedSearchIn": {
+    "properties": {
+     "alerts_enabled": {
+      "default": true,
+      "title": "Alerts Enabled",
+      "type": "boolean"
+     },
+     "filters": {
+      "$ref": "#/components/schemas/SearchFilters-Input"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "filters"
+    ],
+    "title": "SavedSearchIn",
+    "type": "object"
+   },
+   "SavedSearchOut": {
+    "properties": {
+     "alerts_enabled": {
+      "title": "Alerts Enabled",
+      "type": "boolean"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "filters": {
+      "$ref": "#/components/schemas/SearchFilters-Output"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "new_since_last_alert": {
+      "title": "New Since Last Alert",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "filters",
+     "alerts_enabled",
+     "new_since_last_alert",
+     "created_at"
+    ],
+    "title": "SavedSearchOut",
+    "type": "object"
+   },
+   "SavedSearchUpdate": {
+    "properties": {
+     "alerts_enabled": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Alerts Enabled"
+     },
+     "filters": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SearchFilters-Input"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "title": "SavedSearchUpdate",
+    "type": "object"
+   },
    "ScenarioOut": {
     "properties": {
      "present_value": {
@@ -5513,6 +5890,470 @@
      "total"
     ],
     "title": "ScheduleBucket",
+    "type": "object"
+   },
+   "SearchFilters-Input": {
+    "description": "Every search filter. Shared by public search, saved searches and saved-search alerts.",
+    "properties": {
+     "area_max": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Area Max"
+     },
+     "area_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Area Min"
+     },
+     "bathrooms_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bathrooms Min"
+     },
+     "bedrooms_max": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bedrooms Max"
+     },
+     "bedrooms_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bedrooms Min"
+     },
+     "delivery_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeliveryStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "district_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "District Id"
+     },
+     "finishing": {
+      "items": {
+       "$ref": "#/components/schemas/Finishing"
+      },
+      "title": "Finishing",
+      "type": "array"
+     },
+     "floor_max": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Floor Max"
+     },
+     "floor_min": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Floor Min"
+     },
+     "furnished": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Furnished"
+     },
+     "group_code": {
+      "anyOf": [
+       {
+        "maxLength": 20,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Code"
+     },
+     "orientation": {
+      "items": {
+       "$ref": "#/components/schemas/Orientation"
+      },
+      "title": "Orientation",
+      "type": "array"
+     },
+     "payment_mode": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PaymentMode"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "price_max": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Max"
+     },
+     "price_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Min"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "property_type": {
+      "items": {
+       "$ref": "#/components/schemas/PropertyType"
+      },
+      "title": "Property Type",
+      "type": "array"
+     },
+     "purpose": {
+      "anyOf": [
+       {
+        "enum": [
+         "sale",
+         "rent"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purpose"
+     },
+     "q": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Q"
+     }
+    },
+    "title": "SearchFilters",
+    "type": "object"
+   },
+   "SearchFilters-Output": {
+    "description": "Every search filter. Shared by public search, saved searches and saved-search alerts.",
+    "properties": {
+     "area_max": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Area Max"
+     },
+     "area_min": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Area Min"
+     },
+     "bathrooms_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bathrooms Min"
+     },
+     "bedrooms_max": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bedrooms Max"
+     },
+     "bedrooms_min": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bedrooms Min"
+     },
+     "delivery_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeliveryStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "district_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "District Id"
+     },
+     "finishing": {
+      "items": {
+       "$ref": "#/components/schemas/Finishing"
+      },
+      "title": "Finishing",
+      "type": "array"
+     },
+     "floor_max": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Floor Max"
+     },
+     "floor_min": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Floor Min"
+     },
+     "furnished": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Furnished"
+     },
+     "group_code": {
+      "anyOf": [
+       {
+        "maxLength": 20,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Code"
+     },
+     "orientation": {
+      "items": {
+       "$ref": "#/components/schemas/Orientation"
+      },
+      "title": "Orientation",
+      "type": "array"
+     },
+     "payment_mode": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PaymentMode"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "price_max": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Max"
+     },
+     "price_min": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Min"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "property_type": {
+      "items": {
+       "$ref": "#/components/schemas/PropertyType"
+      },
+      "title": "Property Type",
+      "type": "array"
+     },
+     "purpose": {
+      "anyOf": [
+       {
+        "enum": [
+         "sale",
+         "rent"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purpose"
+     },
+     "q": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Q"
+     }
+    },
+    "title": "SearchFilters",
     "type": "object"
    },
    "SentOut": {
@@ -5630,6 +6471,36 @@
      "expires_in"
     ],
     "title": "TokenOut",
+    "type": "object"
+   },
+   "TrendPoint": {
+    "properties": {
+     "median_per_sqm": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median Per Sqm"
+     },
+     "month": {
+      "title": "Month",
+      "type": "string"
+     },
+     "sample_size": {
+      "title": "Sample Size",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "month",
+     "sample_size",
+     "median_per_sqm"
+    ],
+    "title": "TrendPoint",
     "type": "object"
    },
    "UserUpdate": {
@@ -9286,6 +10157,104 @@
     ]
    }
   },
+  "/listings/{listing_id}/financials/compare": {
+   "get": {
+    "operationId": "compare_listings__listing_id__financials_compare_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "listing_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Listing Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "discount_rate",
+      "required": true,
+      "schema": {
+       "anyOf": [
+        {
+         "maximum": 1.0,
+         "minimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        }
+       ],
+       "title": "Discount Rate"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cash_price",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "exclusiveMinimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cash Price"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CashComparison"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Compare",
+    "tags": [
+     "market"
+    ]
+   }
+  },
   "/listings/{listing_id}/photos": {
    "post": {
     "operationId": "upload_photo_listings__listing_id__photos_post",
@@ -9399,6 +10368,152 @@
     "summary": "Delete Photo",
     "tags": [
      "listings"
+    ]
+   }
+  },
+  "/listings/{listing_id}/price-history": {
+   "get": {
+    "operationId": "price_history_listings__listing_id__price_history_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "listing_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Listing Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PricePoint"
+         },
+         "title": "Response Price History Listings  Listing Id  Price History Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Price History",
+    "tags": [
+     "market"
+    ]
+   }
+  },
+  "/market/summary": {
+   "get": {
+    "operationId": "market_summary_market_summary_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "purpose",
+      "required": false,
+      "schema": {
+       "default": "sale",
+       "enum": [
+        "sale",
+        "rent"
+       ],
+       "title": "Purpose",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "district_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "District Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "property_type",
+      "required": false,
+      "schema": {
+       "default": [],
+       "items": {
+        "$ref": "#/components/schemas/PropertyType"
+       },
+       "title": "Property Type",
+       "type": "array"
+      }
+     },
+     {
+      "in": "query",
+      "name": "months",
+      "required": false,
+      "schema": {
+       "default": 12,
+       "maximum": 36,
+       "minimum": 1,
+       "title": "Months",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MarketSummary"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Market Summary",
+    "tags": [
+     "market"
     ]
    }
   },
@@ -9892,6 +11007,282 @@
     "summary": "Claim Property",
     "tags": [
      "properties"
+    ]
+   }
+  },
+  "/saved-searches": {
+   "get": {
+    "operationId": "list_saved_saved_searches_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SavedSearchOut"
+         },
+         "title": "Response List Saved Saved Searches Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Saved",
+    "tags": [
+     "saved searches"
+    ]
+   },
+   "post": {
+    "operationId": "create_saved_searches_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedSearchIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedSearchOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create",
+    "tags": [
+     "saved searches"
+    ]
+   }
+  },
+  "/saved-searches/{saved_id}": {
+   "delete": {
+    "operationId": "delete_saved_searches__saved_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "saved_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Saved Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete",
+    "tags": [
+     "saved searches"
+    ]
+   },
+   "patch": {
+    "operationId": "update_saved_searches__saved_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "saved_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Saved Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedSearchUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedSearchOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update",
+    "tags": [
+     "saved searches"
+    ]
+   }
+  },
+  "/saved-searches/{saved_id}/results": {
+   "get": {
+    "operationId": "results_saved_searches__saved_id__results_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "saved_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Saved Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "newest",
+       "enum": [
+        "newest",
+        "price_asc",
+        "price_desc",
+        "area_desc",
+        "ppsqm_asc"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "mark_seen",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Mark Seen",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Page_ListingCard_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Results",
+    "tags": [
+     "saved searches"
     ]
    }
   },

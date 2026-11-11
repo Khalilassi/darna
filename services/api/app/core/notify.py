@@ -28,7 +28,7 @@ from app.models.entities import DeviceToken, Notification, User
 
 log = logging.getLogger("darna.notify")
 
-CATEGORIES = ("messages", "offers", "deals", "viewings", "verification", "listings", "support")
+CATEGORIES = ("messages", "offers", "deals", "viewings", "verification", "listings", "alerts", "support")
 
 
 def category_of(type_: str) -> str:
@@ -40,10 +40,12 @@ def category_of(type_: str) -> str:
         return "deals"
     if type_.startswith("viewing_"):
         return "viewings"
-    if type_.startswith(("verification_", "ownership_")):
+    if type_.startswith(("verification_", "ownership_", "account_")):
         return "verification"
     if type_.startswith("listing_"):
         return "listings"
+    if type_.startswith("saved_search_"):
+        return "alerts"
     return "support"
 
 
@@ -65,6 +67,7 @@ COPY = {
         "viewings": ("Viewing update", "A viewing request was updated."),
         "verification": ("Verification update", "There is an update on your verification."),
         "listings": ("Listing update", "There is an update on your listing."),
+        "alerts": ("New homes for you", "New listings match one of your saved searches."),
         "support": ("Darna", "You have a new update."),
     },
     "ar": {
@@ -74,6 +77,7 @@ COPY = {
         "viewings": ("تحديث على المعاينة", "تم تحديث طلب معاينة."),
         "verification": ("تحديث التوثيق", "يوجد تحديث على طلب التوثيق."),
         "listings": ("تحديث على الإعلان", "يوجد تحديث على إعلانك."),
+        "alerts": ("منازل جديدة لك", "إعلانات جديدة تطابق أحد عمليات البحث المحفوظة."),
         "support": ("دارنا", "لديك تحديث جديد."),
     },
 }

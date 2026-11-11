@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit, totp
@@ -13,7 +14,8 @@ from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user
-from app.core.errors import Conflict, Forbidden, Unauthorized, ValidationFailed
+from app.core.errors import Conflict, Forbidden, RateLimited, Unauthorized, ValidationFailed
+from app.core.notify import notify
 from app.core.security import (
     DUMMY_HASH,
     create_access_token,
@@ -22,7 +24,7 @@ from app.core.security import (
     sha256_hex,
     verify_password,
 )
-from app.models.entities import OwnershipClaim, RefreshToken, User, VerificationRequest
+from app.models.entities import LoginThrottle, OwnershipClaim, RefreshToken, User, VerificationRequest
 from app.models.enums import ClaimStatus, Role, VerificationKind, VerificationStatus
 from app.schemas.common import ORM, Ok
 
@@ -121,14 +123,53 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)) 
     return out
 
 
+# Account lockout: after LOCK_AFTER failed attempts within LOCK_WINDOW, sign-in for that email is refused
+# for LOCK_DURATION, whatever the password. Counted per email hash for unknown emails too, so the
+# behaviour never reveals whether an account exists. The per-IP limiter above still applies.
+LOCK_AFTER = 8
+LOCK_WINDOW = timedelta(minutes=15)
+LOCK_DURATION = timedelta(minutes=15)
+
+
+def _throttle(db: Session, email: str) -> LoginThrottle:
+    key = sha256_hex(email)
+    db.execute(pg_insert(LoginThrottle).values(email_hash=key, failures=0, window_started_at=utcnow()).on_conflict_do_nothing())
+    row = db.scalar(select(LoginThrottle).where(LoginThrottle.email_hash == key).with_for_update())
+    assert row is not None
+    return row
+
+
+def _register_failure(db: Session, row: LoginThrottle, user: User | None, ip: str | None) -> None:
+    now = utcnow()
+    if now - row.window_started_at > LOCK_WINDOW:
+        row.failures, row.window_started_at = 0, now
+    row.failures += 1
+    if row.failures >= LOCK_AFTER:
+        row.locked_until = now + LOCK_DURATION
+        row.failures, row.window_started_at = 0, now
+        if user is not None:
+            audit(db, "user.locked_out", "user", user.id, ip=ip)
+            notify(db, user.id, "account_locked")
+
+
 @router.post("/login", response_model=TokenOut, dependencies=[Depends(rate_limit.limit("login", 20, 300))])
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> TokenOut:
-    user = db.scalar(select(User).where(User.email == body.email.lower()))
+    email = body.email.lower()
+    ip = client_ip(request)
+    throttle = _throttle(db, email)
+    if throttle.locked_until and throttle.locked_until > utcnow():
+        db.commit()
+        raise RateLimited("Too many failed sign-in attempts. Try again later.", code="too_many_failed_logins",
+                          details={"retry_after_seconds": int((throttle.locked_until - utcnow()).total_seconds())})
+    user = db.scalar(select(User).where(User.email == email))
     if user is None:
         verify_password(body.password, DUMMY_HASH)  # equalize timing
+        _register_failure(db, throttle, None, ip)
+        db.commit()
         raise Unauthorized("Invalid email or password", code="invalid_credentials")
     if not verify_password(body.password, user.password_hash):
-        audit(db, "user.login_failed", "user", user.id, ip=client_ip(request))
+        audit(db, "user.login_failed", "user", user.id, ip=ip)
+        _register_failure(db, throttle, user, ip)
         db.commit()
         raise Unauthorized("Invalid email or password", code="invalid_credentials")
     if not user.is_active:
@@ -138,10 +179,12 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> Tok
             raise Unauthorized("Two-factor code required", code="mfa_required")
         counter = totp.verify(totp.decrypt_secret(user.totp_secret_encrypted or ""), body.totp_code, user.totp_last_counter)
         if counter is None:
-            audit(db, "user.mfa_failed", "user", user.id, ip=client_ip(request))
+            audit(db, "user.mfa_failed", "user", user.id, ip=ip)
+            _register_failure(db, throttle, user, ip)
             db.commit()
             raise Unauthorized("Invalid two-factor code", code="mfa_invalid")
         user.totp_last_counter = counter
+    db.delete(throttle)  # successful sign-in resets the counter
     out = _issue_tokens(db, user)
     db.commit()
     return out

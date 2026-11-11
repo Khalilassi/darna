@@ -18,9 +18,11 @@ from app.modules import (
     deals,
     documents,
     listings,
+    market,
     messaging,
     notifications,
     properties,
+    saved_searches,
     support,
     verification,
     viewings,
@@ -59,7 +61,7 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
-    for r in (auth, catalog, documents, verification, properties, listings, messaging, viewings, deals, notifications, support, admin):
+    for r in (auth, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
 
     media = settings.storage_dir / "public"
