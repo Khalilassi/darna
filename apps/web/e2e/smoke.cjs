@@ -3,7 +3,9 @@ const { chromium } = require("playwright");
 const path = require("node:path");
 
 const WEB = process.env.WEB_URL || "http://localhost:3000";
-const SHOTS = path.join(__dirname, "..", "docs", "screenshots");
+// CI sets E2E_SCREENSHOT_DIR to a temp folder so runs never overwrite the committed screenshots.
+const SHOTS = process.env.E2E_SCREENSHOT_DIR || path.join(__dirname, "..", "docs", "screenshots");
+require("node:fs").mkdirSync(SHOTS, { recursive: true });
 const results = [];
 const check = (name, ok, detail = "") => {
   results.push({ name, ok });

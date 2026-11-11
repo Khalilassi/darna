@@ -6,7 +6,9 @@ const path = require("node:path");
 
 const API = process.env.API_URL || "http://localhost:8000";
 const ADMIN = process.env.ADMIN_URL || "http://localhost:3001";
-const SHOTS = path.join(__dirname, "..", "docs", "screenshots");
+// CI sets E2E_SCREENSHOT_DIR to a temp folder so runs never overwrite the committed screenshots.
+const SHOTS = process.env.E2E_SCREENSHOT_DIR || path.join(__dirname, "..", "docs", "screenshots");
+require("node:fs").mkdirSync(SHOTS, { recursive: true });
 const PASSWORD = "Demo-pass-2026";
 
 async function api(method, p, { token, json, form } = {}) {
@@ -64,7 +66,7 @@ const check = (name, ok, detail = "") => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
   const nav = await page.getByRole("navigation", { name: "Main" }).getByRole("link").allTextContents();
-  check("reviewer nav filtered", JSON.stringify(nav) === JSON.stringify(["Dashboard", "Verification queue", "Listings moderation"]), nav.join(", "));
+  check("reviewer nav filtered", JSON.stringify(nav) === JSON.stringify(["Dashboard", "Verification queue", "Listings moderation", "Account security"]), nav.join(", "));
   await page.locator(".stat-value").first().waitFor();
   check("dashboard analytics loaded", (await page.locator(".stat").count()) >= 7);
   const stored = await page.evaluate(() => ({ session: Object.keys(sessionStorage), local: Object.keys(localStorage) }));
