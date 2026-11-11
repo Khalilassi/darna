@@ -41,7 +41,7 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 | Root `npm ci`, `npm run typecheck`, `npm test` (the CI JS job steps) | pass |
 | Playwright smoke against live API: mobile web journeys, admin (12 checks), web (24 checks) | pass (run by the build agents; scripts in each app) |
 | Docker image / docker-compose | **not run** (no Docker daemon in this environment) |
-| GitHub Actions CI | **not yet observed running** on GitHub |
+| GitHub Actions CI (`api` + `js` jobs) | **green** on commit `3750af4` (run #8); earlier WIP snapshot commits failed as expected |
 | Native iOS/Android device or emulator runs | **not run**; no APK/IPA has been produced |
 
 Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `apps/web/docs/screenshots/`.
@@ -57,7 +57,7 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - The dev database used during this session contains extra test records from agent E2E runs; reset with `python seed.py --reset`.
 
 ## Next implementation tasks (priority order) — see `docs/BACKLOG.md`
-1. Run CI on GitHub and fix any environment differences; build and run the Docker image.
+1. Build and run the Docker image (CI is already green on GitHub).
 2. Scheduled jobs: offer expiry sweep, document retention purge, featured-listing expiry.
 3. Push notifications via Expo push (adapter exists: `app/core/notify.py`), SMS/OTP phone verification adapter.
 4. Native QA on Android emulator + iOS simulator; EAS development builds; date pickers for all date fields.
