@@ -256,6 +256,7 @@ class Listing(IdMixin, TimestampMixin, Base):
     featured_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     view_count: Mapped[int] = mapped_column(Integer, default=0)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    approved_version: Mapped[int | None] = mapped_column(Integer)
 
     property: Mapped[Property] = relationship()
     owner: Mapped[User] = relationship()
