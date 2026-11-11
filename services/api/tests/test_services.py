@@ -86,3 +86,19 @@ def test_services_admin_permissions(make_user, admin):
     assert support.get("/admin/services/providers").status_code == 200
     bad = admin.post("/admin/services/providers", json={**PROVIDER, "website": "not a url"})
     assert bad.status_code == 422
+
+
+def test_localized_note_arabic_names_and_category_filter(make_user, admin, project, reviewer):
+    p = _provider(admin)
+    _provider(admin, category="mover", name_en="Synthetic Movers", name_ar="ناقلون تجريبيون")
+    assert [x["category"] for x in admin.get("/admin/services/providers", params={"category": "mover"}).json()] == ["mover"]
+    admin.patch(f"/admin/services/providers/{p['id']}", json={"verified": True})
+    owner, buyer = make_user(verified=True), make_user()
+    lid = publish_listing(owner, reviewer, project)
+    d = buyer.post("/deals/offers", json={"listing_id": lid, "kind": "sale", "amount": "2400000"}).json()
+    ar = buyer.get("/services/suggestions", params={"deal_id": d["id"]}, headers={"Accept-Language": "ar"}).json()
+    assert "مهنيون" in ar["note"]
+    assert "Independent" in buyer.get("/services/suggestions", params={"deal_id": d["id"]}).json()["note"]
+    buyer.post("/services/referrals", json={"provider_id": p["id"]})
+    row = admin.get("/admin/services/referrals").json()[0]
+    assert row["provider_name"] == "Synthetic Legal Co" and row["provider_name_ar"] == "شركة قانونية تجريبية"

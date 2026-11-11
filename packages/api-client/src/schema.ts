@@ -1638,6 +1638,8 @@ export interface components {
             provider_id: string;
             /** Provider Name */
             provider_name: string;
+            /** Provider Name Ar */
+            provider_name_ar: string;
             status: components["schemas"]["ReferralStatus"];
             /** User Name */
             user_name: string;
@@ -3909,10 +3911,7 @@ export interface components {
              * Format: uuid
              */
             deal_id: string;
-            /**
-             * Note
-             * @default Independent professionals. Darna is not a party to their services; agree terms directly with them.
-             */
+            /** Note */
             note: string;
             status: components["schemas"]["DealStatus"];
         };
@@ -4417,7 +4416,9 @@ export interface operations {
     };
     admin_providers_admin_services_providers_get: {
         parameters: {
-            query?: never;
+            query?: {
+                category?: components["schemas"]["ServiceCategory"] | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4431,6 +4432,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminProviderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

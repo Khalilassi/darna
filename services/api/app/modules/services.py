@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core import rate_limit
 from app.core.audit import audit
 from app.core.db import get_db, utcnow
-from app.core.deps import client_ip, current_user, require
+from app.core.deps import client_ip, current_user, request_lang, require
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.models.entities import Deal, ServiceProvider, ServiceReferral, User
 from app.models.enums import DealStatus as DS
@@ -86,7 +86,13 @@ class SuggestionsOut(BaseModel):
     deal_id: uuid.UUID
     status: DS
     categories: list[ServiceCategory]
-    note: str = "Independent professionals. Darna is not a party to their services; agree terms directly with them."
+    note: str
+
+
+NOTE = {
+    "en": "Independent professionals. Darna is not a party to their services; agree terms directly with them.",
+    "ar": "مهنيون مستقلون. دارنا ليست طرفًا في خدماتهم؛ اتفق على الشروط معهم مباشرة.",
+}
 
 
 def _deal_for(db: Session, user: User, deal_id: uuid.UUID) -> Deal:
@@ -97,9 +103,10 @@ def _deal_for(db: Session, user: User, deal_id: uuid.UUID) -> Deal:
 
 
 @router.get("/suggestions", response_model=SuggestionsOut)
-def suggestions(deal_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def suggestions(request: Request, deal_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
     deal = _deal_for(db, user, deal_id)
-    return SuggestionsOut(deal_id=deal.id, status=deal.status, categories=SUGGESTIONS.get(deal.status, []))
+    return SuggestionsOut(deal_id=deal.id, status=deal.status, categories=SUGGESTIONS.get(deal.status, []),
+                          note=NOTE[request_lang(request)])
 
 
 class ReferralIn(BaseModel):
@@ -226,8 +233,12 @@ def _apply(p: ServiceProvider, data: dict) -> None:
 
 
 @admin_router.get("/providers", response_model=list[AdminProviderOut])
-def admin_providers(_: User = Depends(require("services.manage")), db: Session = Depends(get_db)):
-    return [_admin_provider_out(p) for p in db.scalars(select(ServiceProvider).order_by(ServiceProvider.category, ServiceProvider.name_en))]
+def admin_providers(category: ServiceCategory | None = None, _: User = Depends(require("services.manage")),
+                    db: Session = Depends(get_db)):
+    stmt = select(ServiceProvider)
+    if category:
+        stmt = stmt.where(ServiceProvider.category == category)
+    return [_admin_provider_out(p) for p in db.scalars(stmt.order_by(ServiceProvider.category, ServiceProvider.name_en))]
 
 
 @admin_router.post("/providers", response_model=AdminProviderOut, status_code=201)
@@ -264,6 +275,7 @@ class AdminReferralOut(BaseModel):
     id: uuid.UUID
     provider_id: uuid.UUID
     provider_name: str
+    provider_name_ar: str
     user_name: str
     # Only present when the user chose to share it.
     user_phone: str | None
@@ -286,7 +298,7 @@ def admin_referrals(status: list[ReferralStatus] = Query(default=[]), _: User = 
     out = []
     for r in db.scalars(stmt.order_by(ServiceReferral.created_at.desc()).limit(500)).all():
         u = db.get(User, r.user_id)
-        out.append(AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, user_name=u.full_name if u else "",
+        out.append(AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, provider_name_ar=r.provider.name_ar, user_name=u.full_name if u else "",
                                     user_phone=u.phone if (u and r.share_phone) else None, deal_id=r.deal_id, message=r.message,
                                     status=r.status, created_at=r.created_at))
     return out
@@ -304,7 +316,7 @@ def update_referral(referral_id: uuid.UUID, body: ReferralStatusIn, request: Req
     audit(db, "service.referral_updated", "service_referral", r.id, actor_id=staff.id, data={"status": body.status}, ip=client_ip(request))
     db.commit()
     u = db.get(User, r.user_id)
-    return AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, user_name=u.full_name if u else "",
+    return AdminReferralOut(id=r.id, provider_id=r.provider_id, provider_name=r.provider.name_en, provider_name_ar=r.provider.name_ar, user_name=u.full_name if u else "",
                             user_phone=u.phone if (u and r.share_phone) else None, deal_id=r.deal_id, message=r.message,
                             status=r.status, created_at=r.created_at)
 

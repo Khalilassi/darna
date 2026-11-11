@@ -485,6 +485,10 @@
       "title": "Provider Name",
       "type": "string"
      },
+     "provider_name_ar": {
+      "title": "Provider Name Ar",
+      "type": "string"
+     },
      "status": {
       "$ref": "#/components/schemas/ReferralStatus"
      },
@@ -508,6 +512,7 @@
      "id",
      "provider_id",
      "provider_name",
+     "provider_name_ar",
      "user_name",
      "user_phone",
      "deal_id",
@@ -7422,7 +7427,6 @@
       "type": "string"
      },
      "note": {
-      "default": "Independent professionals. Darna is not a party to their services; agree terms directly with them.",
       "title": "Note",
       "type": "string"
      },
@@ -7433,7 +7437,8 @@
     "required": [
      "deal_id",
      "status",
-     "categories"
+     "categories",
+     "note"
     ],
     "title": "SuggestionsOut",
     "type": "object"
@@ -8511,6 +8516,24 @@
   "/admin/services/providers": {
    "get": {
     "operationId": "admin_providers_admin_services_providers_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/ServiceCategory"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "content": {
@@ -8525,6 +8548,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "security": [
