@@ -9,6 +9,7 @@ import io
 import random
 import sys
 from datetime import UTC, date, datetime, timedelta
+from datetime import date as _date
 from decimal import Decimal
 
 from PIL import Image, ImageDraw
@@ -16,20 +17,45 @@ from sqlalchemy import select, text
 
 from app.core.config import get_settings
 from app.core.db import Base, get_engine, session_factory
-from app.core.security import hash_password
-from app.core.storage import public_storage
-from app.models.entities import District, Listing, ListingPhoto, OwnershipClaim, Project, Property, User
+from app.core.security import hash_password, sha256_hex
+from app.core.storage import private_storage, public_storage
+from app.models.entities import (
+    ChecklistItem,
+    Conversation,
+    Deal,
+    DealEvent,
+    District,
+    Document,
+    Listing,
+    ListingPhoto,
+    Message,
+    Offer,
+    OwnershipClaim,
+    Project,
+    Property,
+    SupportCase,
+    User,
+    VerificationRequest,
+)
 from app.models.enums import (
     ClaimCapacity,
     ClaimStatus,
+    DealKind,
+    DealStatus,
     DeliveryStatus,
+    DocumentKind,
     Finishing,
     ListingPurpose,
     ListingStatus,
+    OfferStatus,
     Orientation,
+    PartyRole,
     PropertyType,
     Role,
+    SupportCategory,
+    VerificationKind,
 )
+from app.modules.deals import CHECKLISTS
 from app.modules.listings import _refresh_denormalized
 
 DEMO_PASSWORD = "Demo-pass-2026"
@@ -164,9 +190,9 @@ def main(reset: bool) -> None:
     user("support@example.com", "Demo Support", Role.support)
     owners = [user("owner@example.com", "Omar Demo-Owner"), user("owner2@example.com", "Mona Demo-Owner", locale="ar"),
               user("owner3@example.com", "Karim Demo-Owner")]
-    user("buyer@example.com", "Bassem Demo-Buyer", verified=False)
+    buyer = user("buyer@example.com", "Bassem Demo-Buyer", verified=False)
     user("tenant@example.com", "Tala Demo-Tenant", verified=False, locale="ar")
-    user("newowner@example.com", "Nadia Demo-NewOwner", verified=False)
+    newowner = user("newowner@example.com", "Nadia Demo-NewOwner", verified=False)
     db.flush()
 
     mad = districts["madinaty"]
@@ -215,12 +241,78 @@ def main(reset: bool) -> None:
             key, w, h = public_storage().put_image(synthetic_photo(i * 10 + pos))
             db.add(ListingPhoto(listing_id=listing.id, storage_key=key, width=w, height=h, position=pos))
         created += 1
+    _review_and_activity_samples(db, owners, buyer, newowner, mad, projects["madinaty"])
     db.commit()
     print(f"Seeded {created} synthetic listings. Demo accounts (password: {DEMO_PASSWORD}):")
     for e in ("admin@example.com", "reviewer@example.com", "support@example.com", "owner@example.com", "owner2@example.com",
               "buyer@example.com", "tenant@example.com", "newowner@example.com"):
         print("  ", e)
     _ = admin
+
+
+def _synthetic_doc(db, owner: User, kind: DocumentKind) -> Document:
+    data = b"%PDF-1.4\n% SYNTHETIC DEMO DOCUMENT - not a real record\n"
+    doc = Document(owner_id=owner.id, kind=kind, storage_key=private_storage().put(data), original_name=f"demo-{kind.value}.pdf",
+                   content_type="application/pdf", size_bytes=len(data), sha256=sha256_hex(data),
+                   retain_until=_date.today() + timedelta(days=365))
+    db.add(doc)
+    db.flush()
+    return doc
+
+
+def _review_and_activity_samples(db, owners, buyer, newowner, mad, project) -> None:
+    """Pending work for the admin console and an active negotiation for the buyer demo."""
+    # 1. Pending identity verification + pending ownership claim for the new owner.
+    nid = _synthetic_doc(db, newowner, DocumentKind.national_id)
+    db.add(VerificationRequest(user_id=newowner.id, kind=VerificationKind.identity, document_ids=[str(nid.id)],
+                               note="Synthetic demo submission"))
+    prop = Property(project_id=project.id, district_id=mad[2].id, group_code="88", building_code="14", unit_code="23", floor=2,
+                    identity_key=f"{mad[2].code}|88|14|23", property_type=PropertyType.apartment, area_sqm=Decimal("132"),
+                    bedrooms=3, bathrooms=2, finishing=Finishing.semi_finished, delivery_status=DeliveryStatus.ready,
+                    orientation=Orientation.north, created_by_id=newowner.id)
+    db.add(prop)
+    db.flush()
+    claim = OwnershipClaim(property_id=prop.id, claimant_id=newowner.id, capacity=ClaimCapacity.owner)
+    db.add(claim)
+    db.flush()
+    contract = _synthetic_doc(db, newowner, DocumentKind.ownership_contract)
+    db.add(VerificationRequest(user_id=newowner.id, kind=VerificationKind.ownership, claim_id=claim.id,
+                               document_ids=[str(contract.id)], note="Synthetic demo claim"))
+
+    # 2. A listing waiting for moderation (owner is verified).
+    listing = db.scalar(select(Listing).where(Listing.owner_id == owners[2].id).order_by(Listing.created_at.desc()))
+    if listing:
+        listing.status = ListingStatus.pending_review
+        listing.approved_version = None
+        listing.published_at = None
+
+    # 3. An open negotiation + conversation between the demo buyer and the first owner.
+    target = db.scalar(select(Listing).where(Listing.owner_id == owners[0].id, Listing.status == ListingStatus.active,
+                                             Listing.sale_cash_price.is_not(None)).order_by(Listing.created_at))
+    if target:
+        conv = Conversation(listing_id=target.id, buyer_id=buyer.id, owner_id=owners[0].id, last_message_at=NOW)
+        db.add(conv)
+        db.flush()
+        db.add_all([
+            Message(conversation_id=conv.id, sender_id=buyer.id, body="Hello, is the apartment still available?",
+                    created_at=NOW - timedelta(hours=5)),
+            Message(conversation_id=conv.id, sender_id=owners[0].id, body="Yes, happy to arrange a viewing.",
+                    created_at=NOW - timedelta(hours=4)),
+        ])
+        deal = Deal(listing_id=target.id, kind=DealKind.sale, buyer_id=buyer.id, owner_id=owners[0].id, confirmations={})
+        db.add(deal)
+        db.flush()
+        for i, (code, who, req) in enumerate(CHECKLISTS[DealKind.sale]):
+            db.add(ChecklistItem(deal_id=deal.id, code=code, responsible=who, required_for=req, position=i))
+        amount = (target.sale_cash_price * Decimal("0.95")).quantize(Decimal("1000"))
+        db.add(Offer(deal_id=deal.id, made_by=PartyRole.buyer, author_id=buyer.id, amount=amount, terms={},
+                     message="Synthetic demo offer", status=OfferStatus.pending, expires_at=NOW + timedelta(hours=60)))
+        db.add(DealEvent(deal_id=deal.id, actor_id=buyer.id, type="deal.opened", data={"kind": "sale"}))
+        assert deal.status == DealStatus.negotiating
+
+    # 4. A support case.
+    db.add(SupportCase(reporter_id=buyer.id, category=SupportCategory.broker_report, subject_type="listing",
+                       description="Synthetic demo report: caller said they represent an agency."))
 
 
 if __name__ == "__main__":
