@@ -75,26 +75,32 @@ describe("login second factor", () => {
 });
 
 describe("account security page", () => {
-  it("enrolls: shows QR + key, confirms the code, then refreshes the session", async () => {
+  it("enrolls: re-checks the password, shows QR + key, confirms the code, then switches to the MFA session", async () => {
+    const fresh = { access_token: "a2", refresh_token: "r2", token_type: "bearer", expires_in: 900 };
     const api: Partial<AdminApi> = {
       mfaSetup: vi.fn().mockResolvedValue({ secret: "ABCDEFGHIJKLMNOP", otpauth_uri: "otpauth://totp/Darna:r?secret=ABCDEFGHIJKLMNOP" }),
-      mfaConfirm: vi.fn().mockResolvedValue({ ok: true }),
+      mfaConfirm: vi.fn().mockResolvedValue(fresh),
     };
     const refreshMe = vi.fn().mockResolvedValue(undefined);
+    const adoptTokens = vi.fn();
     render(
       <ToastProvider>
-        <MockAuthProvider me={reviewer} api={api} refreshMe={refreshMe}>
+        <MockAuthProvider me={reviewer} api={api} refreshMe={refreshMe} adoptTokens={adoptTokens}>
           <SecurityPage />
         </MockAuthProvider>
       </ToastProvider>,
     );
     expect(screen.getByText("Off")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /set up two-factor/i })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Confirm your password"), "Sup3r-secret-pass");
     await userEvent.click(screen.getByRole("button", { name: /set up two-factor/i }));
+    expect(api.mfaSetup).toHaveBeenCalledWith("Sup3r-secret-pass");
     expect(await screen.findByAltText(/QR code/)).toHaveAttribute("src", "data:image/png;base64,QR");
     expect(screen.getByLabelText("Setup key")).toHaveTextContent("ABCD EFGH IJKL MNOP");
     await userEvent.type(screen.getByLabelText(/6-digit code/), "654321");
     await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
     expect(api.mfaConfirm).toHaveBeenCalledWith("654321");
+    await waitFor(() => expect(adoptTokens).toHaveBeenCalledWith(fresh));
     await waitFor(() => expect(refreshMe).toHaveBeenCalled());
     expect(await screen.findByText(/Two-factor authentication is on/)).toBeInTheDocument();
   });

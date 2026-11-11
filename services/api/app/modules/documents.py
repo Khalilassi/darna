@@ -13,7 +13,7 @@ from app.core import rate_limit
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
-from app.core.deps import PERMISSIONS, client_ip, current_user
+from app.core.deps import client_ip, current_user, has_permission
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.scanning import ensure_clean
 from app.core.security import sha256_hex, sign_document_access, verify_document_access
@@ -44,7 +44,7 @@ def can_access_document(db: Session, user: User, doc: Document) -> bool:
         return False
     if doc.owner_id == user.id:
         return True
-    if user.role in PERMISSIONS["document.review"]:
+    if has_permission(user, "document.review"):
         return True
     # Counterparty in a deal where this document was attached to the checklist.
     return bool(
@@ -112,14 +112,16 @@ def signed_url(document_id: uuid.UUID, user: User = Depends(current_user), db: S
     doc = db.get(Document, document_id)
     if doc is None or not can_access_document(db, user, doc):
         raise NotFound("Document not found")
-    token, exp = sign_document_access(doc.id, user.id)
+    token, exp = sign_document_access(doc.id, user.id, mfa=user.session_mfa)
     return {"url": f"{get_settings().public_base_url}/documents/{doc.id}/content?token={token}", "expires_at": exp}
 
 
 @router.get("/{document_id}/content")
 def content(document_id: uuid.UUID, request: Request, token: str = Query(max_length=300), db: Session = Depends(get_db)):
-    uid = verify_document_access(document_id, token)
+    uid, mfa = verify_document_access(document_id, token)
     user = db.get(User, uid)
+    if user is not None:
+        user.session_mfa = mfa
     doc = db.get(Document, document_id)
     # Re-check authorization at read time: access may have been revoked since the URL was issued.
     if user is None or not user.is_active or doc is None or not can_access_document(db, user, doc):

@@ -33,7 +33,7 @@ def verify_password(password: str, hashed: str) -> bool:
 DUMMY_HASH = _ph.hash("timing-equalizer-not-a-real-password")
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
+def create_access_token(user_id: uuid.UUID, role: str, mfa: bool = False) -> str:
     s = get_settings()
     now = utcnow()
     payload = {
@@ -43,6 +43,8 @@ def create_access_token(user_id: uuid.UUID, role: str) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=s.access_token_minutes)).timestamp()),
         "jti": uuid.uuid4().hex,
+        # Whether this session was established with a second factor (staff tools require it).
+        "mfa": mfa,
     }
     return jwt.encode(payload, s.jwt_secret, algorithm=s.jwt_algorithm)
 
@@ -70,23 +72,28 @@ def sha256_hex(value: str | bytes) -> str:
 
 
 # ---- signed, short-lived document access tokens (bound to user + document)
-def sign_document_access(document_id: uuid.UUID, user_id: uuid.UUID) -> tuple[str, int]:
+def sign_document_access(document_id: uuid.UUID, user_id: uuid.UUID, mfa: bool = False) -> tuple[str, int]:
+    """Short-lived URL token bound to document, user, expiry and whether the issuing session used MFA
+    (re-checked at read time, where there is no access token to tell)."""
     s = get_settings()
     exp = int(time.time()) + s.document_url_ttl_seconds
-    msg = f"{document_id}.{user_id}.{exp}"
+    m = 1 if mfa else 0
+    msg = f"{document_id}.{user_id}.{exp}.{m}"
     sig = hmac.new(s.jwt_secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
-    return f"{user_id}.{exp}.{sig}", exp
+    return f"{user_id}.{exp}.{m}.{sig}", exp
 
 
-def verify_document_access(document_id: uuid.UUID, token: str) -> uuid.UUID:
+def verify_document_access(document_id: uuid.UUID, token: str) -> tuple[uuid.UUID, bool]:
     s = get_settings()
     try:
-        user_id, exp_s, sig = token.split(".")
+        user_id, exp_s, m, sig = token.split(".")
         exp = int(exp_s)
         uid = uuid.UUID(user_id)
+        if m not in ("0", "1"):
+            raise ValueError(m)
     except ValueError as exc:
         raise Unauthorized("Malformed document token", code="invalid_document_token") from exc
-    expected = hmac.new(s.jwt_secret.encode(), f"{document_id}.{uid}.{exp}".encode(), hashlib.sha256).hexdigest()
+    expected = hmac.new(s.jwt_secret.encode(), f"{document_id}.{uid}.{exp}.{m}".encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, sig) or exp < int(time.time()):
         raise Unauthorized("Invalid or expired document token", code="invalid_document_token")
-    return uid
+    return uid, m == "1"

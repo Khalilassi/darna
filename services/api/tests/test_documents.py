@@ -23,11 +23,13 @@ def test_signed_url_tampering_and_revocation(make_user, client, reviewer):
     did = a.upload_doc("passport")
     url = a.post(f"/documents/{did}/signed-url").json()["url"].replace("http://localhost:8000", "")
     token = url.split("token=")[1]
-    uid, exp, sig = token.split(".")
-    forged = f"/documents/{did}/content?token={b.id}.{exp}.{sig}"
+    uid, exp, m, sig = token.split(".")
+    forged = f"/documents/{did}/content?token={b.id}.{exp}.{m}.{sig}"
     assert client.get(forged).status_code == 401
-    expired = f"/documents/{did}/content?token={uid}.1.{sig}"
+    expired = f"/documents/{did}/content?token={uid}.1.{m}.{sig}"
     assert client.get(expired).status_code == 401
+    upgraded = f"/documents/{did}/content?token={uid}.{exp}.1.{sig}"  # claiming an MFA session
+    assert client.get(upgraded).status_code == 401
     assert client.get(f"/documents/{did}/content").status_code == 422
     # Reviewer can access for verification
     assert reviewer.post(f"/documents/{did}/signed-url").status_code == 200

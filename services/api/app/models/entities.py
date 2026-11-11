@@ -76,6 +76,9 @@ def _in_list(values) -> str:
 
 # --------------------------------------------------------------------------- users & auth
 class User(IdMixin, TimestampMixin, Base):
+    # Set per request from the access token (not stored): did this session use a second factor?
+    session_mfa = False
+
     __tablename__ = "users"
     # A verified phone number belongs to one account only.
     __table_args__ = (
@@ -132,6 +135,8 @@ class RefreshToken(IdMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The session was established with a second factor; refreshed access tokens keep this.
+    mfa: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
 # --------------------------------------------------------------------------- catalog

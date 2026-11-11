@@ -28,13 +28,15 @@ def test_register_property_creates_claim_and_verification(make_user, project, re
     assert len(q) == 1 and q[0]["claim"]["identity_key"].endswith("|7|45|12")
 
 
-def test_duplicate_property_rejected_even_with_formatting_differences(make_user, project):
+def test_registering_an_existing_unit_becomes_a_claim_even_with_formatting_differences(make_user, project):
     a, b = make_user(), make_user()
-    assert register_property(a, project, unit="12", building="45", group="7").status_code == 201
+    first = register_property(a, project, unit="12", building="45", group="7")
+    assert first.status_code == 201 and first.json()["claimed_existing"] is False
     r = register_property(b, project, unit=" 012", building="0045", group="07")
-    assert r.status_code == 409
-    err = r.json()["error"]
-    assert err["code"] == "property_exists" and err["details"]["property_id"]
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["claimed_existing"] is True and body["property"]["id"] == first.json()["property"]["id"]
+    assert body["claim"]["status"] == "submitted"  # no approved owner yet: reviewers decide between the claims
 
 
 def test_same_unit_number_in_other_building_is_distinct(make_user, project):
@@ -102,16 +104,18 @@ def test_concurrent_registration_of_same_unit_creates_one_property(make_user, pr
         c = TestClient(app)
         barrier.wait()
         r = c.post("/properties", headers=owner.h, json={"property": property_payload(project), "claim": {"document_ids": [doc]}})
-        results.append(r.status_code)
+        results.append((r.status_code, r.json().get("claimed_existing")))
 
     threads = [threading.Thread(target=go, args=(o, d)) for o, d in zip(owners, docs, strict=True)]
     [t.start() for t in threads]
     [t.join() for t in threads]
-    assert sorted(results) == [201] + [409] * 5
+    # One registration wins; the others become claims on the same property.
+    assert sorted(results) == [(201, False)] + [(201, True)] * 5
     from sqlalchemy import func, select
 
-    from app.models.entities import Property
+    from app.models.entities import OwnershipClaim, Property
     assert db.scalar(select(func.count()).select_from(Property)) == 1
+    assert db.scalar(select(func.count()).select_from(OwnershipClaim)) == 6
 
 
 def test_competing_claim_opens_dispute_and_resolution(make_user, project, reviewer, admin):
@@ -151,10 +155,26 @@ def test_withdraw_claim_dismisses_dispute(make_user, project, reviewer, admin):
     assert admin.get("/admin/disputes").json() == []
 
 
-def test_identity_check(make_user, project):
-    a = make_user()
+def test_no_free_unit_existence_lookup_and_claims_are_rate_limited(make_user, project, reviewer, monkeypatch):
+    """Public listings show group/floor/type; a free existence oracle would reveal building and unit numbers."""
+    from app.core import rate_limit
+    from app.core.config import get_settings
+    owner, prober = make_user(), make_user()
     body = {k: v for k, v in property_payload(project).items() if k in ("project_id", "district_id", "group_code", "building_code", "unit_code", "property_type")}
-    assert a.post("/properties/identity-check", json=body).json()["exists"] is False
-    register_property(a, project)
-    out = a.post("/properties/identity-check", json={**body, "unit_code": "0012"}).json()
-    assert out["exists"] is True and out["has_live_listing"] is False
+    assert prober.post("/properties/identity-check", json=body).status_code in (404, 405)
+    r = register_property(owner, project)
+    approve_pending_claim(reviewer, r.json()["claim"]["id"])
+    pid = r.json()["property"]["id"]
+    # Each probe of an owned unit is a reviewable claim that opens a dispute; claim/withdraw loops are capped.
+    monkeypatch.setattr(get_settings(), "rate_limit_enabled", True)
+    rate_limit.reset()
+    codes = []
+    for _ in range(4):
+        doc = prober.upload_doc("ownership_contract")
+        c = prober.post(f"/properties/{pid}/claims", json={"document_ids": [doc]})
+        codes.append(c.status_code)
+        if c.status_code == 201:
+            assert c.json()["status"] == "disputed"
+            prober.post(f"/properties/claims/{c.json()['id']}/withdraw")
+    rate_limit.reset()
+    assert codes == [201, 201, 201, 429]

@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast";
 const onlyDigits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
 export default function SecurityPage() {
-  const { me, refreshMe } = useAuth();
+  const { me, refreshMe, adoptTokens } = useAuth();
   const api = useApi();
   const toast = useToast();
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -33,12 +33,19 @@ export default function SecurityPage() {
     }
   }
 
-  const start = () => run(async () => setSetup(await api.mfaSetup()));
+  const start = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      setSetup(await api.mfaSetup(password));
+      setPassword("");
+    });
+  };
 
   const confirm = (e: FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      await api.mfaConfirm(code);
+      // Confirming ends every earlier session; continue with the fresh two-factor session it returns.
+      adoptTokens(await api.mfaConfirm(code));
       setSetup(null);
       setCode("");
       await refreshMe();
@@ -95,11 +102,17 @@ export default function SecurityPage() {
         {!enabled && !setup && (
           <>
             <p>Use an authenticator app such as Google Authenticator, Microsoft Authenticator, 1Password or Authy.</p>
-            <div>
-              <button type="button" className="btn btn-primary" onClick={start} disabled={busy}>
-                {busy ? "Preparing…" : "Set up two-factor authentication"}
-              </button>
-            </div>
+            <form className="stack gap-md" onSubmit={start} aria-label="Start two-factor setup">
+              <div className="field">
+                <label htmlFor="setup-password">Confirm your password</label>
+                <input id="setup-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              <div>
+                <button type="submit" className="btn btn-primary" disabled={busy || !password}>
+                  {busy ? "Preparing…" : "Set up two-factor authentication"}
+                </button>
+              </div>
+            </form>
           </>
         )}
 

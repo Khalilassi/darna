@@ -62,7 +62,7 @@ export function makeAdminApi(call: Call) {
     deals: (status?: DealStatus[]) => call((c) => c.GET("/admin/deals", { params: { query: { status } } })),
     expireOffers: () => call((c) => c.POST("/admin/maintenance/expire-offers")),
 
-    mfaSetup: () => call((c) => c.POST("/auth/mfa/setup")),
+    mfaSetup: (password: string) => call((c) => c.POST("/auth/mfa/setup", { body: { password } })),
     mfaConfirm: (code: string) => call((c) => c.POST("/auth/mfa/confirm", { body: { code } })),
     mfaDisable: (code: string, password: string) => call((c) => c.POST("/auth/mfa/disable", { body: { code, password } })),
 

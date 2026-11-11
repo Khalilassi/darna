@@ -2396,87 +2396,6 @@
     "title": "HTTPValidationError",
     "type": "object"
    },
-   "IdentityCheckOut": {
-    "properties": {
-     "exists": {
-      "title": "Exists",
-      "type": "boolean"
-     },
-     "has_live_listing": {
-      "title": "Has Live Listing",
-      "type": "boolean"
-     },
-     "property_id": {
-      "anyOf": [
-       {
-        "format": "uuid",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Property Id"
-     }
-    },
-    "required": [
-     "exists",
-     "property_id",
-     "has_live_listing"
-    ],
-    "title": "IdentityCheckOut",
-    "type": "object"
-   },
-   "IdentityIn": {
-    "properties": {
-     "building_code": {
-      "maxLength": 20,
-      "minLength": 1,
-      "title": "Building Code",
-      "type": "string"
-     },
-     "district_id": {
-      "format": "uuid",
-      "title": "District Id",
-      "type": "string"
-     },
-     "group_code": {
-      "maxLength": 20,
-      "minLength": 1,
-      "title": "Group Code",
-      "type": "string"
-     },
-     "project_id": {
-      "format": "uuid",
-      "title": "Project Id",
-      "type": "string"
-     },
-     "property_type": {
-      "$ref": "#/components/schemas/PropertyType"
-     },
-     "unit_code": {
-      "anyOf": [
-       {
-        "maxLength": 20,
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Unit Code"
-     }
-    },
-    "required": [
-     "project_id",
-     "district_id",
-     "group_code",
-     "building_code",
-     "property_type"
-    ],
-    "title": "IdentityIn",
-    "type": "object"
-   },
    "Installment-Input": {
     "properties": {
      "amount": {
@@ -3767,6 +3686,20 @@
      "password"
     ],
     "title": "MfaDisableIn",
+    "type": "object"
+   },
+   "MfaSetupIn": {
+    "properties": {
+     "password": {
+      "maxLength": 128,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "password"
+    ],
+    "title": "MfaSetupIn",
     "type": "object"
    },
    "MfaSetupOut": {
@@ -6149,6 +6082,51 @@
      "attest_not_broker"
     ],
     "title": "RegisterIn",
+    "type": "object"
+   },
+   "RegisterOut": {
+    "properties": {
+     "claim": {
+      "$ref": "#/components/schemas/ClaimOut"
+     },
+     "claimed_existing": {
+      "default": false,
+      "title": "Claimed Existing",
+      "type": "boolean"
+     },
+     "live_listing_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Live Listing Id"
+     },
+     "live_listing_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ListingStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "property": {
+      "$ref": "#/components/schemas/PropertyOut"
+     }
+    },
+    "required": [
+     "property",
+     "claim",
+     "live_listing_id",
+     "live_listing_status"
+    ],
+    "title": "RegisterOut",
     "type": "object"
    },
    "RegisterPropertyIn": {
@@ -9437,7 +9415,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/Ok"
+         "$ref": "#/components/schemas/TokenOut"
         }
        }
       },
@@ -9515,8 +9493,18 @@
   },
   "/auth/mfa/setup": {
    "post": {
-    "description": "Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.",
+    "description": "Start enrollment. The secret is shown once; MFA turns on only after /mfa/confirm.\n\nRe-checks the password so a stolen access token alone cannot bind an attacker's authenticator.",
     "operationId": "mfa_setup_auth_mfa_setup_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaSetupIn"
+       }
+      }
+     },
+     "required": true
+    },
     "responses": {
      "200": {
       "content": {
@@ -9527,6 +9515,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "security": [
@@ -12371,6 +12369,7 @@
   },
   "/properties": {
    "post": {
+    "description": "Register a unit with an ownership claim; if the unit already exists, the submission becomes a claim on it.\n\nThere is deliberately no free \"does this unit exist?\" lookup: combined with the public listing fields\n(group, floor, type) it would reveal the private building and unit numbers of listed homes.",
     "operationId": "register_property_properties_post",
     "requestBody": {
      "content": {
@@ -12387,7 +12386,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/MyPropertyOut"
+         "$ref": "#/components/schemas/RegisterOut"
         }
        }
       },
@@ -12458,53 +12457,6 @@
      }
     ],
     "summary": "Withdraw Claim",
-    "tags": [
-     "properties"
-    ]
-   }
-  },
-  "/properties/identity-check": {
-   "post": {
-    "description": "Lets an owner learn whether a unit already exists, so they claim it instead of duplicating it.",
-    "operationId": "identity_check_properties_identity_check_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/IdentityIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/IdentityCheckOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Identity Check",
     "tags": [
      "properties"
     ]

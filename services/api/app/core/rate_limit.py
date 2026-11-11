@@ -111,6 +111,14 @@ def set_redis_limiter(limiter: RedisLimiter | None) -> None:
     _redis_limiter = limiter
 
 
+def enforce(key: str, max_calls: int, per_seconds: int) -> None:
+    """Inline limit on an arbitrary key (e.g. per user or per destination), for use inside handlers."""
+    if not get_settings().rate_limit_enabled:
+        return
+    if not _backend_hit(key, max_calls, per_seconds):
+        raise RateLimited("Too many requests, try again later", details={"retry_after_seconds": per_seconds})
+
+
 def limit(scope: str, max_calls: int, per_seconds: int):
     def dependency(request: Request) -> None:
         if not get_settings().rate_limit_enabled:

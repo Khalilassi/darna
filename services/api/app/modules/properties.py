@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core import rate_limit
 from app.core.audit import audit
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user
@@ -179,10 +180,21 @@ class MyPropertyOut(BaseModel):
     live_listing_status: ListingStatus | None
 
 
-class IdentityCheckOut(BaseModel):
-    exists: bool
-    property_id: uuid.UUID | None
-    has_live_listing: bool
+class RegisterOut(MyPropertyOut):
+    # True when the unit was already registered and the submission became an ownership claim on it.
+    claimed_existing: bool = False
+
+
+# Registering or claiming a unit is the only way to learn whether it is already registered, and it
+# needs an ownership document plus reviewer attention, so it is limited per user (and per property).
+CLAIMS_PER_USER_PER_DAY = 10
+CLAIMS_PER_USER_PROPERTY_PER_MONTH = 3
+
+
+def _limit_claims(user: User, prop_id: uuid.UUID | None = None) -> None:
+    rate_limit.enforce(f"claim:user:{user.id}", CLAIMS_PER_USER_PER_DAY, 86400)
+    if prop_id is not None:
+        rate_limit.enforce(f"claim:user:{user.id}:property:{prop_id}", CLAIMS_PER_USER_PROPERTY_PER_MONTH, 30 * 86400)
 
 
 def _resolve_identity(db: Session, body: IdentityIn) -> tuple[District, str, str, str, str | None]:
@@ -243,21 +255,16 @@ def _create_claim(db: Session, user: User, prop: Property, claim_in: ClaimIn, do
     return claim
 
 
-@router.post("/identity-check", response_model=IdentityCheckOut)
-def identity_check(body: IdentityIn, _: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Lets an owner learn whether a unit already exists, so they claim it instead of duplicating it."""
-    _, _, _, _, key = _resolve_identity(db, body)
-    prop = db.scalar(select(Property).where(Property.project_id == body.project_id, Property.identity_key == key))
-    live = prop is not None and db.scalar(
-        select(Listing.id).where(Listing.property_id == prop.id, Listing.status.in_(LISTING_OCCUPYING_STATUSES))
-    ) is not None
-    return IdentityCheckOut(exists=prop is not None, property_id=prop.id if prop else None, has_live_listing=bool(live))
-
-
-@router.post("", response_model=MyPropertyOut, status_code=201)
+@router.post("", response_model=RegisterOut, status_code=201)
 def register_property(body: RegisterPropertyIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Register a unit with an ownership claim; if the unit already exists, the submission becomes a claim on it.
+
+    There is deliberately no free "does this unit exist?" lookup: combined with the public listing fields
+    (group, floor, type) it would reveal the private building and unit numbers of listed homes.
+    """
     district, group, building, unit, key = _resolve_identity(db, body.property)
     doc_ids = _validate_claim_docs(db, user, body.claim)
+    _limit_claims(user)
     p = body.property
     prop = Property(
         project_id=p.project_id, district_id=district.id, group_code=group, building_code=building, unit_code=unit,
@@ -266,19 +273,22 @@ def register_property(body: RegisterPropertyIn, request: Request, user: User = D
         orientation=p.orientation, created_by_id=user.id,
     )
     db.add(prop)
+    claimed_existing = False
     try:
         db.flush()
-    except IntegrityError as exc:
+    except IntegrityError:
         db.rollback()
-        existing = db.scalar(select(Property.id).where(Property.project_id == p.project_id, Property.identity_key == key))
-        raise Conflict(
-            "This property is already registered. Submit an ownership claim instead.",
-            code="property_exists", details={"property_id": str(existing) if existing else None},
-        ) from exc
+        prop = db.scalar(select(Property).where(Property.project_id == p.project_id, Property.identity_key == key))
+        if prop is None:  # pragma: no cover - the conflicting row was deleted concurrently
+            raise
+        rate_limit.enforce(f"claim:user:{user.id}:property:{prop.id}", CLAIMS_PER_USER_PROPERTY_PER_MONTH, 30 * 86400)
+        claimed_existing = True
     claim = _create_claim(db, user, prop, body.claim, doc_ids, client_ip(request))
-    audit(db, "property.registered", "property", prop.id, actor_id=user.id, ip=client_ip(request))
+    if not claimed_existing:
+        audit(db, "property.registered", "property", prop.id, actor_id=user.id, ip=client_ip(request))
     db.commit()
-    return MyPropertyOut(property=PropertyOut.model_validate(prop), claim=ClaimOut.model_validate(claim), live_listing_id=None, live_listing_status=None)
+    return RegisterOut(property=PropertyOut.model_validate(prop), claim=ClaimOut.model_validate(claim), live_listing_id=None,
+                       live_listing_status=None, claimed_existing=claimed_existing)
 
 
 @router.post("/{property_id}/claims", response_model=ClaimOut, status_code=201)
@@ -287,6 +297,7 @@ def claim_property(property_id: uuid.UUID, body: ClaimIn, request: Request, user
     if prop is None:
         raise NotFound("Property not found")
     doc_ids = _validate_claim_docs(db, user, body)
+    _limit_claims(user, prop.id)
     claim = _create_claim(db, user, prop, body, doc_ids, client_ip(request))
     db.commit()
     return claim

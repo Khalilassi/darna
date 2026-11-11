@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { makeAdminApi, type AdminApi } from "./adminApi";
 import { can, type Permission } from "./permissions";
-import { Session, type Me } from "./session";
+import { Session, type Me, type Tokens } from "./session";
 
 type Status = "loading" | "anonymous" | "authenticated";
 
@@ -15,6 +15,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   /** Re-reads /auth/me (e.g. after enabling two-factor authentication). */
   refreshMe: () => Promise<void>;
+  /** Continue with tokens the API issued outside login (MFA confirmation ends all earlier sessions). */
+  adoptTokens: (tokens: Tokens) => void;
   can: (permission: Permission) => boolean;
 }
 
@@ -68,16 +70,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe(await session.me());
   }, [session]);
 
+  const adoptTokens = useCallback((t: Tokens) => session.adoptTokens(t), [session]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, me, api: makeAdminApi(session.call), login, logout, refreshMe, can: (p) => can(me?.role, p) }),
-    [status, me, session, login, logout, refreshMe],
+    () => ({ status, me, api: makeAdminApi(session.call), login, logout, refreshMe, adoptTokens, can: (p) => can(me?.role, p) }),
+    [status, me, session, login, logout, refreshMe, adoptTokens],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /** Test/storybook helper: provide a fixed user and API implementation. */
 export function MockAuthProvider({
-  me, api, children, status = "authenticated", login, refreshMe,
+  me, api, children, status = "authenticated", login, refreshMe, adoptTokens,
 }: {
   me: Me | null;
   api: Partial<AdminApi>;
@@ -85,6 +89,7 @@ export function MockAuthProvider({
   status?: Status;
   login?: AuthContextValue["login"];
   refreshMe?: AuthContextValue["refreshMe"];
+  adoptTokens?: AuthContextValue["adoptTokens"];
 }) {
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -94,9 +99,10 @@ export function MockAuthProvider({
       login: login ?? (async () => me as Me),
       logout: async () => {},
       refreshMe: refreshMe ?? (async () => {}),
+      adoptTokens: adoptTokens ?? (() => {}),
       can: (p) => can(me?.role, p),
     }),
-    [me, api, status, login, refreshMe],
+    [me, api, status, login, refreshMe, adoptTokens],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

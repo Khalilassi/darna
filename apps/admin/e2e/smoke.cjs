@@ -193,6 +193,7 @@ const focusInfo = (page) =>
   await page.getByRole("heading", { name: "Account security" }).waitFor();
   const setupButton = page.getByRole("button", { name: "Set up two-factor authentication" });
   if (await setupButton.count()) {
+    await page.getByLabel("Confirm your password").fill(PASSWORD);
     await setupButton.click();
     await page.getByLabel(/6-digit code/).waitFor();
     await a11y(page, "account security (setup step)");
