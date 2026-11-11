@@ -13,7 +13,9 @@ export type OwnerProvenance = "seller_provided" | "estimate" | "unknown";
 export const OWNER_PROVENANCES: OwnerProvenance[] = ["seller_provided", "estimate", "unknown"];
 
 export interface AmountState { amount: string; provenance: OwnerProvenance; assumption: string }
-export interface InstallmentState { due_date: string; amount: string; schedule: string; provenance: "seller_provided" | "estimate" }
+// Installment amounts are always seller-provided (the API rejects estimates/unknowns in schedules; only
+// reviewers can mark amounts verified), so the form has no provenance choice for them.
+export interface InstallmentState { due_date: string; amount: string; schedule: string; provenance: "seller_provided" }
 export interface FeeState { code: string; value: AmountState; payer: Schemas["Payer"]; buyer_share: string }
 type OwnPayer = "buyer" | "seller" | "included_in_price";
 
@@ -69,7 +71,7 @@ export function initialListingForm(l?: Pick<Schemas["OwnerListingOut"], "purpose
       original_contract_price: fromAmount(s?.original_contract_price),
       paid_to_developer: fromAmount(s?.paid_to_developer),
       installments: (s?.installments ?? []).map((i) => ({
-        due_date: i.due_date, amount: i.amount, schedule: i.schedule ?? "unit", provenance: i.provenance === "estimate" ? "estimate" : "seller_provided",
+        due_date: i.due_date, amount: i.amount, schedule: i.schedule ?? "unit", provenance: "seller_provided",
       })),
       overdue_payer: (s?.overdue_payer as OwnPayer) ?? "seller",
       maintenance_deposit_due: fromAmount(s?.maintenance_deposit_due),
@@ -318,17 +320,7 @@ function InstallmentsEditor({ items, onChange, errors }: { items: InstallmentSta
               <IconButton icon="trash-outline" label={t("common.remove")} onPress={() => onChange(items.filter((_, j) => j !== i))} />
             </View>
           </Row>
-          <Row gap={8}>
-            <TextField containerStyle={styles.flex} label={t("listingForm.schedule")} value={it.schedule} onChangeText={(v) => update(i, { schedule: v })} maxLength={40} />
-            <View style={styles.flex}>
-              <ChipGroup
-                label={t("listingForm.provenance")}
-                value={it.provenance}
-                onChange={(p) => p && update(i, { provenance: p })}
-                options={(["seller_provided", "estimate"] as const).map((p) => ({ value: p, label: t(`provenance.${p}`) }))}
-              />
-            </View>
-          </Row>
+          <TextField label={t("listingForm.schedule")} value={it.schedule} onChangeText={(v) => update(i, { schedule: v })} maxLength={40} />
         </View>
       ))}
       <Button

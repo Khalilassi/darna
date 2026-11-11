@@ -17,10 +17,12 @@ import uuid
 from contextvars import ContextVar
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Histogram, generate_latest
 
 from app.core.config import get_settings
 
+log = logging.getLogger("darna")
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 _VALID_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 
@@ -54,7 +56,28 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(out, ensure_ascii=False)
 
 
+_factory_installed = False
+
+
+def _install_record_factory() -> None:
+    """Stamp request_id on every LogRecord at creation, so any handler (including third-party log shippers)
+    sees it, not only handlers that carry RequestIdFilter."""
+    global _factory_installed
+    if _factory_installed:
+        return
+    base = logging.getLogRecordFactory()
+
+    def factory(*args, **kwargs):
+        record = base(*args, **kwargs)
+        record.request_id = request_id_var.get() or "-"
+        return record
+
+    logging.setLogRecordFactory(factory)
+    _factory_installed = True
+
+
 def configure_logging() -> None:
+    _install_record_factory()
     root = logging.getLogger()
     if not root.handlers:
         root.addHandler(logging.StreamHandler())
@@ -68,9 +91,23 @@ def configure_logging() -> None:
             h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s"))
 
 
+_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
+
+
+def _method(request: Request) -> str:
+    # Clients can send arbitrary method names; never let them create new metric series.
+    return request.method if request.method in _METHODS else "OTHER"
+
+
 def _route_template(request: Request) -> str:
     route = request.scope.get("route")
     return getattr(route, "path", None) or "unmatched"
+
+
+def error_body(code: str, message: str) -> dict:
+    from app.core.errors import _body
+
+    return _body(code, message)
 
 
 def install(app: FastAPI) -> None:
@@ -82,15 +119,22 @@ def install(app: FastAPI) -> None:
         start = time.perf_counter()
         status = 500
         try:
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            except Exception:
+                # Handle unexpected errors here, while the request id is still set, so the 500 response,
+                # its body and the error log line all carry it.
+                log.exception("unhandled_error path=%s", request.url.path)
+                response = JSONResponse(status_code=500, content=error_body("internal_error", "Internal server error"))
             status = response.status_code
             response.headers["X-Request-ID"] = rid
             return response
         finally:
             route = _route_template(request)
             if route != "/metrics":
-                REQUESTS.labels(request.method, route, str(status)).inc()
-                LATENCY.labels(request.method, route).observe(time.perf_counter() - start)
+                method = _method(request)
+                REQUESTS.labels(method, route, str(status)).inc()
+                LATENCY.labels(method, route).observe(time.perf_counter() - start)
             request_id_var.reset(token)
 
     @app.get("/metrics", include_in_schema=False)

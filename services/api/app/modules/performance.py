@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db, utcnow
 from app.core.deps import current_user
 from app.core.errors import NotFound
-from app.models.entities import Conversation, Deal, Favorite, Listing, ListingDailyView, Offer, User, Viewing
+from app.models.entities import Conversation, Deal, Listing, ListingDailyView, Offer, User, Viewing
 from app.models.enums import PartyRole
 
 router = APIRouter(prefix="/listings", tags=["listings"])
@@ -60,9 +60,10 @@ def performance(listing_id: uuid.UUID, days: int = Query(default=30, ge=7, le=18
     start = today - timedelta(days=days - 1)
     since = datetime(start.year, start.month, start.day, tzinfo=utcnow().tzinfo)
 
-    views = {d: v for d, v in db.execute(select(ListingDailyView.day, ListingDailyView.views)
-                                         .where(ListingDailyView.listing_id == listing_id, ListingDailyView.day >= start)).all()}
-    saves = _by_day(db, Favorite.created_at, Favorite.listing_id == listing_id, Favorite.created_at >= since)
+    daily = db.execute(select(ListingDailyView.day, ListingDailyView.views, ListingDailyView.saves)
+                       .where(ListingDailyView.listing_id == listing_id, ListingDailyView.day >= start)).all()
+    views = {d: v for d, v, _ in daily}
+    saves = {d: n for d, _, n in daily}  # save actions recorded at the time, not current favorites
     inquiries = _by_day(db, Conversation.created_at, Conversation.listing_id == listing_id, Conversation.created_at >= since)
     viewings = _by_day(db, Viewing.created_at, Viewing.listing_id == listing_id, Viewing.created_at >= since)
     # Opening offers only: a buyer's first offer in each negotiation (counters are not new interest).

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -13,21 +13,12 @@ from app.core.db import get_db, utcnow
 from app.core.deps import current_user
 from app.core.errors import Conflict, NotFound
 from app.core.notify import notify
-from app.models.entities import Listing, Property, SavedSearch, User
+from app.models.entities import Listing, ListingPublication, Property, SavedSearch, User
 from app.modules.listings import ListingCard, SearchFilters, SortKey, run_search, search_conditions
 from app.schemas.common import Ok, Page
 
 router = APIRouter(prefix="/saved-searches", tags=["saved searches"])
 MAX_PER_USER = 20
-# Alerts only consider listings published before (now - ALERT_LAG). A publication whose transaction commits
-# late still has published_at below the next cutoff, so it is picked up by the following run, never skipped.
-ALERT_LAG = timedelta(minutes=2)
-
-
-def alert_cutoff():
-    return utcnow() - ALERT_LAG
-
-
 class SavedSearchIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     filters: SearchFilters
@@ -49,14 +40,13 @@ class SavedSearchOut(BaseModel):
     created_at: datetime
 
 
-def _new_count(db: Session, s: SavedSearch, until=None) -> int:
+def _new_count(db: Session, s: SavedSearch, listing_ids: list[uuid.UUID] | None = None) -> int:
+    """Matching listings the user has not seen yet (published after ``last_seen_at``), optionally within a batch."""
     conds, _ = search_conditions(SearchFilters(**s.filters))
-    window = [Listing.published_at > s.last_alerted_at]
-    if until is not None:
-        window.append(Listing.published_at <= until)
+    extra = [Listing.id.in_(listing_ids)] if listing_ids is not None else []
     return db.scalar(
         select(func.count()).select_from(Listing).join(Property, Listing.property_id == Property.id)
-        .where(and_(*conds), *window, Listing.owner_id != s.user_id)
+        .where(and_(*conds), Listing.published_at > s.last_seen_at, Listing.owner_id != s.user_id, *extra)
     ) or 0
 
 
@@ -85,7 +75,7 @@ def create(body: SavedSearchIn, user: User = Depends(current_user), db: Session 
     if count >= MAX_PER_USER:
         raise Conflict(f"You can keep up to {MAX_PER_USER} saved searches", code="too_many_saved_searches")
     s = SavedSearch(user_id=user.id, name=body.name.strip(), filters=body.filters.model_dump(mode="json", exclude_defaults=True),
-                    alerts_enabled=body.alerts_enabled, last_alerted_at=utcnow())
+                    alerts_enabled=body.alerts_enabled, last_seen_at=utcnow())
     db.add(s)
     db.commit()
     return _out(db, s)
@@ -98,7 +88,7 @@ def update(saved_id: uuid.UUID, body: SavedSearchUpdate, user: User = Depends(cu
         s.name = body.name.strip()
     if body.filters is not None:
         s.filters = body.filters.model_dump(mode="json", exclude_defaults=True)
-        s.last_alerted_at = utcnow()  # changed criteria: only listings published from now on are "new"
+        s.last_seen_at = utcnow()  # changed criteria: only listings published from now on are "new"
     if body.alerts_enabled is not None:
         s.alerts_enabled = body.alerts_enabled
     db.commit()
@@ -117,30 +107,40 @@ def results(saved_id: uuid.UUID, sort: SortKey = "newest", page: int = Query(def
             page_size: int = Query(default=20, ge=1, le=50), mark_seen: bool = False,
             user: User = Depends(current_user), db: Session = Depends(get_db)):
     s = _owned(db, user, saved_id)
-    cutoff = alert_cutoff()  # never move the watermark past listings that may not be visible yet
+    seen_at = utcnow()  # taken before searching: anything published later stays "new"
     out = run_search(db, SearchFilters(**s.filters), sort, page, page_size)
-    if mark_seen and cutoff > s.last_alerted_at:
-        s.last_alerted_at = cutoff
+    if mark_seen:
+        s.last_seen_at = seen_at
         db.commit()
     return out
 
 
 # --------------------------------------------------------------------------- worker job
-def send_alerts(db: Session) -> int:
-    """Notify owners of saved searches about listings published since their last alert. Returns alerts sent."""
+def send_alerts(db: Session, batch_size: int = 500) -> int:
+    """Notify saved-search owners about newly published listings. Returns the number of alerts sent.
+
+    Commit-aware: works through the ``listing_publications`` outbox (rows become visible only when the
+    publishing transaction commits) and marks each processed row, so no publication is ever skipped.
+    Listings the user has already seen (published before ``last_seen_at``) and their own listings are
+    excluded.
+    """
+    pubs = db.scalars(
+        select(ListingPublication).where(ListingPublication.processed_at.is_(None))
+        .order_by(ListingPublication.created_at).limit(batch_size).with_for_update(skip_locked=True)
+    ).all()
+    if not pubs:
+        return 0
+    ids = [p.listing_id for p in pubs]
     sent = 0
-    for s in db.scalars(select(SavedSearch).where(SavedSearch.alerts_enabled.is_(True)).with_for_update(skip_locked=True)):
+    for s in db.scalars(select(SavedSearch).where(SavedSearch.alerts_enabled.is_(True))):
         user = db.get(User, s.user_id)
         if user is None or not user.is_active:
             continue
-        cutoff = alert_cutoff()
-        if cutoff <= s.last_alerted_at:
-            continue
-        n = _new_count(db, s, until=cutoff)
+        n = _new_count(db, s, ids)
         if n:
             notify(db, s.user_id, "saved_search_match", saved_search_id=s.id, count=n)
             sent += 1
-        s.last_alerted_at = cutoff
+    now = utcnow()
+    for p in pubs:
+        p.processed_at = now
     return sent
-
-

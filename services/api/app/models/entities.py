@@ -318,6 +318,24 @@ class ListingDailyView(Base):
     listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     views: Mapped[int] = mapped_column(Integer, default=0)
+    # Save actions on that day. Kept here (not derived from current favorites) so unsaving later
+    # does not erase the historical save from performance charts.
+    saves: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class ListingPublication(IdMixin, Base):
+    """Transactional outbox: one row per first publication, written in the publishing transaction.
+
+    The alert worker processes rows where ``processed_at`` is null. A row becomes visible only once its
+    transaction commits, and is marked processed afterwards, so no publication is skipped however long
+    the publishing transaction takes (unlike a time-based watermark).
+    """
+
+    __tablename__ = "listing_publications"
+    __table_args__ = (Index("ix_listing_publications_unprocessed", "created_at", postgresql_where=text("processed_at IS NULL")),)
+    listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Favorite(Base):
@@ -500,8 +518,8 @@ class SavedSearch(IdMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(80))
     filters: Mapped[dict] = mapped_column(Json, default=dict)
     alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Listings published after this instant are "new" for alerts.
-    last_alerted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Listings published after this instant are "new" to the user (badge); also excludes them from alerts.
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class LoginThrottle(Base):

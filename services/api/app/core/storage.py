@@ -19,6 +19,7 @@ from __future__ import annotations
 import io
 import os
 import secrets
+import tempfile
 from pathlib import Path
 from typing import Protocol
 
@@ -107,14 +108,19 @@ class LocalEncryptedStorage:
         """Re-encrypt one object with the primary key (no-op content-wise; readable before and after)."""
         p = self._path(key)
         rotated = self.fernet.rotate(p.read_bytes())
-        # Write a sibling temp file, fsync it, then atomically swap: an interruption never leaves the
-        # document truncated (the old ciphertext stays readable until the replace succeeds).
-        tmp = p.with_name(f".{p.name}.rotating")
-        with open(tmp, "wb") as f:
-            f.write(rotated)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, p)
+        # Write a uniquely named sibling temp file, fsync it, then atomically swap. An interruption never
+        # leaves the document truncated, concurrent rotations never share a temp file, and a failed write
+        # never leaves an orphaned encrypted copy behind.
+        fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".rotating")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(rotated)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, p)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
 
 class PublicMediaStorage:

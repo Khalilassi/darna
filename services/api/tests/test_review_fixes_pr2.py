@@ -162,24 +162,4 @@ def test_saved_search_limit_holds_under_concurrency(make_user, db):
     assert db.query(SavedSearch).filter_by(user_id=u.id).count() == 20
 
 
-# 13. alert watermark never skips late publications
-def test_alert_watermark_lags_so_late_commits_are_not_skipped(make_user, project, reviewer, db, monkeypatch):
-    from app.modules.saved_searches import ALERT_LAG, send_alerts
-    owner, buyer = make_user(verified=True), make_user()
-    sid = buyer.post("/saved-searches", json={"name": "all", "filters": {}}).json()["id"]
-    s = db.get(SavedSearch, sid)
-    s.last_alerted_at = datetime.now(UTC) - timedelta(hours=1)
-    db.commit()
-    lid = publish_listing(owner, reviewer, project)
-    # Simulate a publication that committed late: published_at is just inside the lag window.
-    db.get(Listing, lid).published_at = datetime.now(UTC) - ALERT_LAG / 2
-    db.commit()
-    assert send_alerts(db) == 0  # too recent to be safely counted yet...
-    db.commit()
-    db.refresh(s)
-    assert s.last_alerted_at < db.get(Listing, lid).published_at  # ...and the watermark did not pass it
-    # Time passes: the next run's cutoff moves past the late publication, which is now counted once.
-    monkeypatch.setattr("app.modules.saved_searches.alert_cutoff", lambda: datetime.now(UTC))
-    assert send_alerts(db) == 1
-    db.commit()
-    assert send_alerts(db) == 0
+# 13. alerts are commit-aware (outbox), see tests/test_review_fixes_pr3.py

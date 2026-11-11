@@ -5,7 +5,6 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
-from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
@@ -68,8 +67,10 @@ def get_owned_documents(db: Session, user: User, ids: list[uuid.UUID]) -> list[D
     return list(docs)
 
 
+# Synchronous on purpose: FastAPI runs it in the worker threadpool, so the database work, the malware scan
+# and (S3) storage never block the event loop.
 @router.post("", response_model=DocumentOut, status_code=201, dependencies=[Depends(rate_limit.limit("upload", 60, 3600))])
-async def upload(
+def upload(
     request: Request,
     kind: DocumentKind = Form(...),
     file: UploadFile = File(...),
@@ -77,7 +78,7 @@ async def upload(
     db: Session = Depends(get_db),
 ) -> Document:
     s = get_settings()
-    data = await file.read(s.max_upload_bytes + 1)
+    data = file.file.read(s.max_upload_bytes + 1)
     if len(data) > s.max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
     if not data:
@@ -85,9 +86,8 @@ async def upload(
     ctype = sniff_type(data)  # trust content, not the client-declared type
     if ctype not in ALLOWED_DOC_TYPES:
         raise ValidationFailed("Only PDF, JPEG, PNG or WEBP files are accepted", code="unsupported_file_type")
-    # Scanning and (S3) storage are blocking I/O: run them in a worker thread, not on the event loop.
-    await run_in_threadpool(ensure_clean, data)
-    key = await run_in_threadpool(private_storage().put, data)
+    ensure_clean(data)
+    key = private_storage().put(data)
     doc = Document(
         owner_id=user.id, kind=kind, storage_key=key, original_name=(file.filename or "document")[:200],
         content_type=ctype, size_bytes=len(data), sha256=sha256_hex(data),

@@ -79,10 +79,7 @@ def test_cash_vs_installments_endpoint(make_user, project, reviewer, client):
 
 
 # --------------------------------------------------------------------------- saved searches & alerts
-def test_saved_search_crud_results_and_alerts(make_user, project, reviewer, db, monkeypatch):
-    from datetime import timedelta as _td
-
-    monkeypatch.setattr("app.modules.saved_searches.ALERT_LAG", _td(0))  # alert logic here; lag tested separately
+def test_saved_search_crud_results_and_alerts(make_user, project, reviewer, db):
     owner, buyer, other = make_user(verified=True), make_user(), make_user()
     first = publish_listing(owner, reviewer, project, unit="1")
     r = buyer.post("/saved-searches", json={"name": "3BR to buy", "filters": {"purpose": "sale", "bedrooms_min": 3}})
