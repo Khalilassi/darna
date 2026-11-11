@@ -26,6 +26,8 @@ function TextInput({
     id,
     value,
     dir,
+    // Arabic fields: announce their content in the right language (WCAG 3.1.2 Language of Parts).
+    lang: dir === "rtl" ? "ar" : undefined,
     maxLength,
     placeholder,
     "aria-invalid": !!error || undefined,
