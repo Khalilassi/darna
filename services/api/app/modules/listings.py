@@ -596,8 +596,6 @@ def search_conditions(f: SearchFilters):
 
 def run_search(db: Session, f: SearchFilters, sort: SortKey = "newest", page: int = 1, page_size: int = 20) -> Page[ListingCard]:
     conds, price_col = search_conditions(f)
-    base = select(Listing).join(Property, Listing.property_id == Property.id).where(and_(*conds))
-    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     featured_first = (Listing.featured_until > func.now()).desc().nulls_last()
     order = {
         "newest": [featured_first, Listing.published_at.desc().nulls_last()],
@@ -606,14 +604,29 @@ def run_search(db: Session, f: SearchFilters, sort: SortKey = "newest", page: in
         "area_desc": [Property.area_sqm.desc()],
         "ppsqm_asc": [(Listing.sale_known_total / Property.area_sqm).asc().nulls_last()],
     }[sort]
-    rows = db.scalars(
-        base.options(
-            joinedload(Listing.property).joinedload(Property.project),
-            joinedload(Listing.property).joinedload(Property.district),
-            joinedload(Listing.owner), selectinload(Listing.photos),
-        ).order_by(*order, Listing.id).offset((page - 1) * page_size).limit(page_size)
-    ).unique().all()
-    return Page(items=[ListingCard(**_card(r)) for r in rows], total=total, page=page, page_size=page_size)
+    # One pass over the matches: the page's ids in order plus the total (window count), instead of a separate
+    # COUNT(*) that scans every match a second time.
+    page_rows = db.execute(
+        select(Listing.id, func.count().over().label("total"))
+        .join(Property, Listing.property_id == Property.id).where(and_(*conds))
+        .order_by(*order, Listing.id).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    if page_rows:
+        total = page_rows[0].total
+    else:  # past the last page: the window count is unavailable, count separately
+        total = db.scalar(select(func.count()).select_from(Listing).join(Property, Listing.property_id == Property.id)
+                          .where(and_(*conds))) or 0
+    ids = [r.id for r in page_rows]
+    by_id = {
+        listing.id: listing for listing in db.scalars(
+            select(Listing).where(Listing.id.in_(ids)).options(
+                joinedload(Listing.property).joinedload(Property.project),
+                joinedload(Listing.property).joinedload(Property.district),
+                joinedload(Listing.owner), selectinload(Listing.photos),
+            )
+        ).unique()
+    } if ids else {}
+    return Page(items=[ListingCard(**_card(by_id[i])) for i in ids], total=total, page=page, page_size=page_size)
 
 
 @router.get("", response_model=Page[ListingCard])

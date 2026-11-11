@@ -268,6 +268,10 @@ class Listing(IdMixin, TimestampMixin, Base):
             postgresql_where=text(f"status IN ({_in_list(LISTING_OCCUPYING_STATUSES)})"),
         ),
         Index("ix_listings_status_published", "status", "published_at"),
+        # Trigram indexes make ILIKE '%term%' text search fast for selective terms (pg_trgm extension).
+        Index("ix_listings_title_trgm", "title", postgresql_using="gin", postgresql_ops={"title": "gin_trgm_ops"}),
+        Index("ix_listings_description_trgm", "description", postgresql_using="gin",
+              postgresql_ops={"description": "gin_trgm_ops"}),
     )
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
