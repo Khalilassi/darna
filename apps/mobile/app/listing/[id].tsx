@@ -3,18 +3,17 @@ import { Alert, Platform, ScrollView, StyleSheet, useWindowDimensions, View } fr
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { Schemas } from "@darna/api-client";
-import { api, unwrap } from "../../src/api/client";
-import { errorMessage } from "../../src/api/errors";
 import { useListing, useToggleFavorite } from "../../src/api/queries";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
-  Badge, Button, Card, Divider, ErrorState, Icon, IconButton, KeyValue, LoadingState, Notice, PriceBreakdown, Row, Section, T, TextField,
+  Badge, Button, Card, Divider, ErrorState, Icon, IconButton, LoadingState, Notice, PriceBreakdown, Row, Section, T,
 } from "../../src/components";
+import { CashComparisonTool } from "../../src/features/CashComparison";
+import { PriceHistorySection } from "../../src/features/PriceHistory";
 import { mediaUrl } from "../../src/config";
-import { formatArea, formatDate, formatMoney, formatNumber, formatPercent, localizeDigits, parseAmountInput } from "../../src/i18n/format";
+import { formatArea, formatDate, formatMoney, formatNumber, localizeDigits } from "../../src/i18n/format";
 import { useLanguage } from "../../src/i18n/LanguageProvider";
 import { useCompare } from "../../src/state/compare";
 import { useTheme } from "../../src/theme";
@@ -92,44 +91,6 @@ function Spec({ label, value }: { label: string; value: string }) {
       <T variant="caption" tone="muted">{label}</T>
       <T variant="bodyStrong">{value}</T>
     </View>
-  );
-}
-
-function PresentValue({ listingId }: { listingId: string }) {
-  const { t } = useTranslation();
-  const { lang } = useLanguage();
-  const [rate, setRate] = useState("20");
-  const [error, setError] = useState<string | null>(null);
-  const m = useMutation({
-    mutationFn: async (r: number) =>
-      unwrap(await api.GET("/listings/{listing_id}/financials", { params: { path: { listing_id: listingId }, query: { discount_rate: r } } })),
-  });
-  const pv = m.data?.present_value;
-  const run = () => {
-    const n = parseAmountInput(rate);
-    if (n === null || n < 0 || n > 100) return setError(t("fin.pvRateError"));
-    setError(null);
-    m.mutate(n / 100);
-  };
-  return (
-    <Card>
-      <T variant="heading">{t("fin.pvTitle")}</T>
-      <T variant="caption" tone="muted">{t("fin.pvBody")}</T>
-      <Row gap={10} style={{ alignItems: "flex-end" }}>
-        <TextField containerStyle={{ flex: 1 }} label={t("fin.pvRate")} value={rate} onChangeText={setRate} keyboardType="decimal-pad" error={error} testID="pv-rate" />
-        <Button title={t("fin.pvCalculate")} onPress={run} loading={m.isPending} variant="secondary" testID="pv-calc" />
-      </Row>
-      {m.isError ? <Notice tone="danger">{errorMessage(m.error, t)}</Notice> : null}
-      {pv ? (
-        <View style={{ gap: 8 }} testID="pv-result">
-          <KeyValue label={t("fin.pvNominal")} value={formatMoney(pv.nominal_future, lang)} />
-          <KeyValue label={t("fin.pvValue")} value={formatMoney(pv.present_value, lang)} strong />
-          <KeyValue label={t("fin.pvSaving")} value={formatMoney(pv.saving_vs_nominal, lang)} tone="muted" />
-          <Notice tone="neutral" title={`${t("fin.pvAssumption")} · ${formatPercent(pv.annual_discount_rate, lang, 1)}`}>{pv.assumption}</Notice>
-          <T variant="caption" tone="muted">{t("fin.pvIllustrative")}</T>
-        </View>
-      ) : null}
-    </Card>
   );
 }
 
@@ -255,8 +216,30 @@ function ListingView({ l, refetch }: { l: Detail; refetch: () => void }) {
             <View style={[styles.finCard, { backgroundColor: colors.surface, borderRadius: radii.lg, borderColor: colors.border }]}>
               <PriceBreakdown sale={l.sale_breakdown} rent={l.rent_breakdown} minLeaseMonths={l.rent_terms?.min_lease_months} />
             </View>
-            {l.sale_breakdown && l.sale_breakdown.payment_mode === "installments" ? <PresentValue listingId={l.id} /> : null}
+            {l.sale_breakdown && l.sale_breakdown.payment_mode === "installments" ? <CashComparisonTool listingId={l.id} /> : null}
           </Section>
+
+          <PriceHistorySection listingId={l.id} purpose={isSale ? "sale" : "rent"} />
+
+          <Card>
+            <Row>
+              <Icon name="stats-chart-outline" color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <T variant="bodyStrong">{t("market.compareTitle", { district })}</T>
+                <T variant="caption" tone="muted">{t("market.compareBody")}</T>
+              </View>
+            </Row>
+            <Button
+              title={t("market.compareWithDistrict")}
+              variant="secondary"
+              size="sm"
+              icon="bar-chart-outline"
+              onPress={() =>
+                router.push(`/market?purpose=${isSale ? "sale" : "rent"}&district=${encodeURIComponent(l.district_name_en)}&property_type=${l.property_type}`)
+              }
+              testID="compare-district"
+            />
+          </Card>
 
           <Card>
             <Row>

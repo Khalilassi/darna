@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { useNotifications } from "../../src/api/queries";
+import { useNotifications, useSavedSearches } from "../../src/api/queries";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Badge, Button, Card, Icon, Screen, T, type IconName } from "../../src/components";
 import { formatDate } from "../../src/i18n/format";
@@ -34,6 +34,8 @@ export default function Profile() {
   const { colors } = useTheme();
   const { status, me, signOut } = useAuth();
   const notifications = useNotifications();
+  const savedSearches = useSavedSearches();
+  const newMatches = (savedSearches.data ?? []).reduce((n, s) => n + s.new_since_last_alert, 0);
   const signedIn = status === "signedIn";
   const identity = me?.verification.identity ?? "none";
 
@@ -71,6 +73,8 @@ export default function Profile() {
       {signedIn ? (
         <Card padded={false}>
           <MenuRow icon="home-outline" label={t("profile.ownerHub")} onPress={() => router.push("/owner")} testID="menu-owner" />
+          <MenuRow icon="bookmark-outline" label={t("savedSearch.title")} onPress={() => router.push("/saved-searches")} badge={newMatches} testID="menu-saved-searches" />
+          <MenuRow icon="stats-chart-outline" label={t("market.title")} onPress={() => router.push("/market")} testID="menu-market" />
           <MenuRow icon="calendar-outline" label={t("profile.viewings")} onPress={() => router.push("/viewings")} />
           <MenuRow icon="notifications-outline" label={t("profile.notifications")} onPress={() => router.push("/notifications")} badge={notifications.data?.unread} />
           <MenuRow icon="options-outline" label={t("profile.notificationSettings")} onPress={() => router.push("/notification-settings")} testID="menu-notification-settings" />

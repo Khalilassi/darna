@@ -6,6 +6,9 @@ export function notificationHref(n: Pick<Schemas["NotificationOut"], "type" | "d
   if (d.deal_id) return `/deal/${d.deal_id}`;
   if (d.conversation_id) return `/conversation/${d.conversation_id}`;
   if (d.viewing_id) return "/viewings";
+  if (d.saved_search_id) return `/saved-searches/${d.saved_search_id}`;
+  if (n.type === "saved_search_match") return "/saved-searches";
+  if (n.type === "account_locked") return null;
   if (d.listing_id) return `/owner/listing/${d.listing_id}`;
   if (d.property_id || n.type.startsWith("ownership") || n.type.startsWith("verification")) return "/owner";
   if (n.type.startsWith("support")) return "/support";
