@@ -157,6 +157,8 @@ export function ConfirmDialog({
               setBusy(true);
               try {
                 await onConfirm();
+              } catch {
+                /* the caller reports failures (toast); keep the dialog open so the user can retry */
               } finally {
                 setBusy(false);
               }
