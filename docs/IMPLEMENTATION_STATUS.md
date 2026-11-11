@@ -28,8 +28,10 @@ _Last updated: 2026-11-11. Future sessions: read this first, then `README.md` an
 | Phone verification by SMS code (dev SMS sender only) | ✅ | ✅ verify screen + status badge | – | – |
 | Account lockout after repeated failed sign-ins | ✅ | ✅ message with minutes left | ✅ (shared API) | – |
 | S3-compatible storage, key rotation, ClamAV upload scanning, Redis rate limiting | ✅ | – | – | – |
-| Owner listing performance: daily views/saves/inquiries/viewings/offers, funnel | ✅ | 🚧 in progress | – | – |
+| Owner listing performance: daily views/saves/inquiries/viewings/offers, funnel | ✅ | ✅ | – | – |
 | Observability: request ids (header, error bodies, logs), JSON logs, Prometheus /metrics | ✅ | – | – | – |
+| Professional services directory (verified providers, stage suggestions, referrals with fee disclosure) | ✅ | 🚧 in progress | 🚧 in progress | – |
+| Search performance: trigram indexes, single-pass page/total (`docs/architecture/performance.md`) | ✅ | – | – | – |
 | Audit log, analytics, user management (roles, suspension) | ✅ | – | ✅ | – |
 | EN/AR + RTL, EGP formatting, light/dark | – | ✅ | – | ✅ |
 | Public marketing site, SEO (metadata, sitemap, robots, hreflang) | – | – | – | ✅ |
@@ -42,7 +44,7 @@ two Next.js apps, OpenAPI-generated TS client and shared design tokens in an npm
 
 | Check | Result |
 |---|---|
-| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **150 passed** |
+| `services/api`: `pytest` (real PostgreSQL 16; includes 4 concurrency tests; S3 via moto, Redis via fakeredis, fake clamd) | **176 passed** |
 | `services/api`: `ruff check .` | pass |
 | `services/api`: `alembic upgrade head` + `alembic check` (models match migrations) | pass |
 | `apps/mobile`: `tsc --noEmit` / `jest` | pass / **59 passed** (11 suites) |
