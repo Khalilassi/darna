@@ -1286,6 +1286,45 @@
     "title": "CounterIn",
     "type": "object"
    },
+   "DayStats": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "inquiries": {
+      "title": "Inquiries",
+      "type": "integer"
+     },
+     "offers": {
+      "title": "Offers",
+      "type": "integer"
+     },
+     "saves": {
+      "title": "Saves",
+      "type": "integer"
+     },
+     "viewing_requests": {
+      "title": "Viewing Requests",
+      "type": "integer"
+     },
+     "views": {
+      "title": "Views",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "day",
+     "views",
+     "saves",
+     "inquiries",
+     "viewing_requests",
+     "offers"
+    ],
+    "title": "DayStats",
+    "type": "object"
+   },
    "DealKind": {
     "enum": [
      "sale",
@@ -2060,6 +2099,36 @@
     ],
     "title": "Finishing",
     "type": "string"
+   },
+   "FunnelStep": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "rate_from_previous": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate From Previous"
+     },
+     "step": {
+      "title": "Step",
+      "type": "string"
+     }
+    },
+    "required": [
+     "step",
+     "count",
+     "rate_from_previous"
+    ],
+    "title": "FunnelStep",
+    "type": "object"
    },
    "HTTPValidationError": {
     "properties": {
@@ -4486,6 +4555,80 @@
     ],
     "title": "PaymentMode",
     "type": "string"
+   },
+   "Performance": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     },
+     "days_on_market": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Days On Market"
+     },
+     "funnel": {
+      "items": {
+       "$ref": "#/components/schemas/FunnelStep"
+      },
+      "title": "Funnel",
+      "type": "array"
+     },
+     "listing_id": {
+      "format": "uuid",
+      "title": "Listing Id",
+      "type": "string"
+     },
+     "note": {
+      "default": "Views count public detail-page opens (not your own). Inquiries are new conversations; offers are buyers' opening offers.",
+      "title": "Note",
+      "type": "string"
+     },
+     "published_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Published At"
+     },
+     "series": {
+      "items": {
+       "$ref": "#/components/schemas/DayStats"
+      },
+      "title": "Series",
+      "type": "array"
+     },
+     "total_views_all_time": {
+      "title": "Total Views All Time",
+      "type": "integer"
+     },
+     "totals": {
+      "$ref": "#/components/schemas/DayStats"
+     }
+    },
+    "required": [
+     "listing_id",
+     "days",
+     "published_at",
+     "days_on_market",
+     "total_views_all_time",
+     "series",
+     "totals",
+     "funnel"
+    ],
+    "title": "Performance",
+    "type": "object"
    },
    "PhotoOut": {
     "properties": {
@@ -10003,6 +10146,66 @@
      }
     ],
     "summary": "My Listing",
+    "tags": [
+     "listings"
+    ]
+   }
+  },
+  "/listings/mine/{listing_id}/performance": {
+   "get": {
+    "operationId": "performance_listings_mine__listing_id__performance_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "listing_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Listing Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 30,
+       "maximum": 180,
+       "minimum": 7,
+       "title": "Days",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Performance"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Performance",
     "tags": [
      "listings"
     ]

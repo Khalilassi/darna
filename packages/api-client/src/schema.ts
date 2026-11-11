@@ -797,6 +797,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/listings/mine/{listing_id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Performance */
+        get: operations["performance_listings_mine__listing_id__performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/listings/{listing_id}": {
         parameters: {
             query?: never;
@@ -1750,6 +1767,24 @@ export interface components {
             message?: string | null;
             terms?: components["schemas"]["OfferTerms"];
         };
+        /** DayStats */
+        DayStats: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Inquiries */
+            inquiries: number;
+            /** Offers */
+            offers: number;
+            /** Saves */
+            saves: number;
+            /** Viewing Requests */
+            viewing_requests: number;
+            /** Views */
+            views: number;
+        };
         /**
          * DealKind
          * @enum {string}
@@ -2067,6 +2102,15 @@ export interface components {
          * @enum {string}
          */
         Finishing: "core_shell" | "semi_finished" | "fully_finished" | "furnished";
+        /** FunnelStep */
+        FunnelStep: {
+            /** Count */
+            count: number;
+            /** Rate From Previous */
+            rate_from_previous: number | null;
+            /** Step */
+            step: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2837,6 +2881,32 @@ export interface components {
          * @enum {string}
          */
         PaymentMode: "cash" | "installments";
+        /** Performance */
+        Performance: {
+            /** Days */
+            days: number;
+            /** Days On Market */
+            days_on_market: number | null;
+            /** Funnel */
+            funnel: components["schemas"]["FunnelStep"][];
+            /**
+             * Listing Id
+             * Format: uuid
+             */
+            listing_id: string;
+            /**
+             * Note
+             * @default Views count public detail-page opens (not your own). Inquiries are new conversations; offers are buyers' opening offers.
+             */
+            note: string;
+            /** Published At */
+            published_at: string | null;
+            /** Series */
+            series: components["schemas"]["DayStats"][];
+            /** Total Views All Time */
+            total_views_all_time: number;
+            totals: components["schemas"]["DayStats"];
+        };
         /** PhotoOut */
         PhotoOut: {
             /** Height */
@@ -5256,6 +5326,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnerListingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    performance_listings_mine__listing_id__performance_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Performance"];
                 };
             };
             /** @description Validation Error */
