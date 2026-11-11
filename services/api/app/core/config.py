@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     offer_default_expiry_hours: int = 72
 
+    push_provider: str = "log"  # log | expo
+    expo_access_token: str | None = None
+    # Staff (reviewer/support/admin) must use two-factor authentication to sign in.
+    require_staff_mfa: bool = False
+
     def validate_for_env(self) -> None:
         if self.env in {"staging", "production"}:
             if self.jwt_secret == DEV_SECRET or len(self.jwt_secret) < 32:
