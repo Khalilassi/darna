@@ -17,6 +17,7 @@ instance/task role) — never from this codebase.
 from __future__ import annotations
 
 import io
+import os
 import secrets
 from pathlib import Path
 from typing import Protocol
@@ -105,7 +106,15 @@ class LocalEncryptedStorage:
     def rotate(self, key: str) -> None:
         """Re-encrypt one object with the primary key (no-op content-wise; readable before and after)."""
         p = self._path(key)
-        p.write_bytes(self.fernet.rotate(p.read_bytes()))
+        rotated = self.fernet.rotate(p.read_bytes())
+        # Write a sibling temp file, fsync it, then atomically swap: an interruption never leaves the
+        # document truncated (the old ciphertext stays readable until the replace succeeds).
+        tmp = p.with_name(f".{p.name}.rotating")
+        with open(tmp, "wb") as f:
+            f.write(rotated)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, p)
 
 
 class PublicMediaStorage:

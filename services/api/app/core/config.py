@@ -77,10 +77,12 @@ class Settings(BaseSettings):
         if self.env in {"staging", "production"}:
             if self.jwt_secret == DEV_SECRET or len(self.jwt_secret) < 32:
                 raise RuntimeError("DARNA_JWT_SECRET must be set to a strong secret outside development")
-            if self.malware_scanner == "none":
-                raise RuntimeError("DARNA_MALWARE_SCANNER must be configured (clamd) outside development")
+            if self.malware_scanner != "clamd":
+                raise RuntimeError("DARNA_MALWARE_SCANNER must be 'clamd' outside development")
             if DEV_FERNET_KEY in keys:
                 raise RuntimeError("DARNA_DOCUMENT_ENCRYPTION_KEY must be set outside development")
+        if self.malware_scanner not in {"none", "clamd"}:
+            raise RuntimeError("DARNA_MALWARE_SCANNER must be 'none' or 'clamd'")
         if self.storage_backend not in {"local", "s3"}:
             raise RuntimeError("DARNA_STORAGE_BACKEND must be 'local' or 's3'")
         if self.storage_backend == "s3" and not (self.s3_private_bucket and self.s3_public_bucket and self.media_base_url):

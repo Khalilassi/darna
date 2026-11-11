@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -481,8 +482,9 @@ async def upload_photo(listing_id: uuid.UUID, file: UploadFile = File(...), user
     data = await file.read(get_settings().max_upload_bytes + 1)
     if len(data) > get_settings().max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
-    ensure_clean(data)
-    key, w, h = public_storage().put_image(data)
+    # Scanning, image re-encoding and (S3) storage are blocking: keep them off the event loop.
+    await run_in_threadpool(ensure_clean, data)
+    key, w, h = await run_in_threadpool(public_storage().put_image, data)
     photo = ListingPhoto(listing_id=listing.id, storage_key=key, width=w, height=h, position=count)
     db.add(photo)
     listing.version += 1

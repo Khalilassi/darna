@@ -5,6 +5,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
@@ -84,8 +85,9 @@ async def upload(
     ctype = sniff_type(data)  # trust content, not the client-declared type
     if ctype not in ALLOWED_DOC_TYPES:
         raise ValidationFailed("Only PDF, JPEG, PNG or WEBP files are accepted", code="unsupported_file_type")
-    ensure_clean(data)
-    key = private_storage().put(data)
+    # Scanning and (S3) storage are blocking I/O: run them in a worker thread, not on the event loop.
+    await run_in_threadpool(ensure_clean, data)
+    key = await run_in_threadpool(private_storage().put, data)
     doc = Document(
         owner_id=user.id, kind=kind, storage_key=key, original_name=(file.filename or "document")[:200],
         content_type=ctype, size_bytes=len(data), sha256=sha256_hex(data),

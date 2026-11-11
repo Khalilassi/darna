@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -19,6 +19,13 @@ from app.schemas.common import Ok, Page
 
 router = APIRouter(prefix="/saved-searches", tags=["saved searches"])
 MAX_PER_USER = 20
+# Alerts only consider listings published before (now - ALERT_LAG). A publication whose transaction commits
+# late still has published_at below the next cutoff, so it is picked up by the following run, never skipped.
+ALERT_LAG = timedelta(minutes=2)
+
+
+def alert_cutoff():
+    return utcnow() - ALERT_LAG
 
 
 class SavedSearchIn(BaseModel):
@@ -42,11 +49,14 @@ class SavedSearchOut(BaseModel):
     created_at: datetime
 
 
-def _new_count(db: Session, s: SavedSearch) -> int:
+def _new_count(db: Session, s: SavedSearch, until=None) -> int:
     conds, _ = search_conditions(SearchFilters(**s.filters))
+    window = [Listing.published_at > s.last_alerted_at]
+    if until is not None:
+        window.append(Listing.published_at <= until)
     return db.scalar(
         select(func.count()).select_from(Listing).join(Property, Listing.property_id == Property.id)
-        .where(and_(*conds), Listing.published_at > s.last_alerted_at, Listing.owner_id != s.user_id)
+        .where(and_(*conds), *window, Listing.owner_id != s.user_id)
     ) or 0
 
 
@@ -70,6 +80,7 @@ def list_saved(user: User = Depends(current_user), db: Session = Depends(get_db)
 
 @router.post("", response_model=SavedSearchOut, status_code=201)
 def create(body: SavedSearchIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    db.execute(select(User.id).where(User.id == user.id).with_for_update())  # serialize the limit check per user
     count = db.scalar(select(func.count()).select_from(SavedSearch).where(SavedSearch.user_id == user.id)) or 0
     if count >= MAX_PER_USER:
         raise Conflict(f"You can keep up to {MAX_PER_USER} saved searches", code="too_many_saved_searches")
@@ -106,9 +117,10 @@ def results(saved_id: uuid.UUID, sort: SortKey = "newest", page: int = Query(def
             page_size: int = Query(default=20, ge=1, le=50), mark_seen: bool = False,
             user: User = Depends(current_user), db: Session = Depends(get_db)):
     s = _owned(db, user, saved_id)
+    cutoff = alert_cutoff()  # never move the watermark past listings that may not be visible yet
     out = run_search(db, SearchFilters(**s.filters), sort, page, page_size)
-    if mark_seen:
-        s.last_alerted_at = utcnow()
+    if mark_seen and cutoff > s.last_alerted_at:
+        s.last_alerted_at = cutoff
         db.commit()
     return out
 
@@ -121,11 +133,14 @@ def send_alerts(db: Session) -> int:
         user = db.get(User, s.user_id)
         if user is None or not user.is_active:
             continue
-        n = _new_count(db, s)
+        cutoff = alert_cutoff()
+        if cutoff <= s.last_alerted_at:
+            continue
+        n = _new_count(db, s, until=cutoff)
         if n:
             notify(db, s.user_id, "saved_search_match", saved_search_id=s.id, count=n)
             sent += 1
-        s.last_alerted_at = utcnow()
+        s.last_alerted_at = cutoff
     return sent
 
 

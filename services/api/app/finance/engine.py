@@ -100,6 +100,8 @@ class SaleInput(BaseModel):
         codes = [f.code for f in self.fees]
         if len(codes) != len(set(codes)):
             raise ValueError("fee codes must be unique")
+        if any(i.provenance in (Provenance.estimate, Provenance.unknown) for i in self.installments):
+            raise ValueError("installment amounts must be seller-provided or verified, not estimates or unknown")
         if self.overdue_payer == Payer.split or self.maintenance_payer == Payer.split:
             raise ValueError("overdue and maintenance payers must be buyer, seller or included_in_price")
         return self
@@ -419,11 +421,15 @@ class CashComparison(BaseModel):
     future_present_value: Decimal
     nominal_total: Decimal
     present_value_total: Decimal
-    # The all-cash price that would cost the same as this installment plan in today's money.
+    # Known buyer costs other than the price (maintenance, fees, buyer-paid overdue). Paid in either option.
+    other_known_costs: Decimal
+    # The cash price paid to the OWNER at which paying cash costs the same as this installment plan in
+    # today's money (other known costs are paid on top in both options).
     break_even_cash_price: Decimal
     cash_alternative: Decimal | None
+    cash_alternative_all_in: Decimal | None
     cheaper_option: Literal["installments", "cash", "equal"] | None
-    present_value_difference: Decimal | None  # cash_alternative - present_value_total
+    present_value_difference: Decimal | None  # cash_alternative_all_in - present_value_total
     excludes_estimates_and_unknowns: bool
     assumption: str
 
@@ -439,9 +445,11 @@ def compare_cash_vs_installments(
     breakdown = compute_sale(inp, as_of)
     pv = present_value(inp.installments, as_of, annual_rate, lang)
     pv_total = breakdown.initial_cash_required + pv.present_value
-    cheaper = diff = None
+    other = breakdown.initial_cash_required - breakdown.owner_cash_price
+    cheaper = diff = all_in = None
     if cash_alternative is not None:
-        diff = q(cash_alternative - pv_total)
+        all_in = cash_alternative + other  # the same maintenance/fees apply when paying cash
+        diff = q(all_in - pv_total)
         cheaper = "equal" if diff == 0 else ("installments" if diff > 0 else "cash")
     return CashComparison(
         annual_discount_rate=annual_rate,
@@ -450,18 +458,22 @@ def compare_cash_vs_installments(
         future_present_value=pv.present_value,
         nominal_total=breakdown.known_total_cost,
         present_value_total=q(pv_total),
-        break_even_cash_price=q(pv_total),
+        other_known_costs=q(other),
+        break_even_cash_price=q(pv_total - other),
         cash_alternative=q(cash_alternative) if cash_alternative is not None else None,
+        cash_alternative_all_in=q(all_in) if all_in is not None else None,
         cheaper_option=cheaper,
         present_value_difference=diff,
         excludes_estimates_and_unknowns=bool(breakdown.estimated_extra or breakdown.unconfirmed),
         assumption=(
             f"الأقساط المستقبلية مخصومة بمعدل {annual_rate * 100:.2f}% سنويًا (معدل اخترته أنت، مثل ما يمكن أن تكسبه أموالك "
-            "أو تكلفة الاقتراض). دفع سعر التعادل نقدًا اليوم يكلف نفس تكلفة خطة الأقساط بقيمة أموال اليوم. "
+            "أو تكلفة الاقتراض). دفع سعر التعادل نقدًا للمالك اليوم يكلف نفس تكلفة خطة الأقساط بقيمة أموال اليوم، "
+            "مع دفع الصيانة والرسوم المعروفة في الحالتين. "
             "المبالغ المعروفة فقط؛ التقديرات والرسوم غير المؤكدة غير مشمولة."
             if lang == "ar" else
             f"Future installments are discounted at {annual_rate * 100:.2f}% per year (a rate you chose, e.g. what your "
-            "money could earn or what borrowing costs you). Paying the break-even cash price today costs the same as the "
-            "installment plan in today's money. Known amounts only; estimates and unconfirmed fees are not included."
+            "money could earn or what borrowing costs you). Paying the owner the break-even cash price today costs the same "
+            "as the installment plan in today's money; maintenance and known fees are paid on top in both options. "
+            "Known amounts only; estimates and unconfirmed fees are not included."
         ),
     )
