@@ -50,6 +50,7 @@ const referral = (over: Partial<ServiceReferral> = {}): ServiceReferral => ({
   id: "22222222-2222-2222-2222-222222222222",
   provider_id: provider.id,
   provider_name: "Demo Legal",
+  provider_name_ar: "قانوني تجريبي",
   user_name: "Bassem Buyer",
   user_phone: null,
   deal_id: null,
