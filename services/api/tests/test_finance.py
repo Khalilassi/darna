@@ -14,7 +14,7 @@ from app.finance.engine import (
     compute_sale,
     present_value,
 )
-from app.models.enums import PaymentMode, Payer, Provenance
+from app.models.enums import Payer, PaymentMode, Provenance
 
 AS_OF = date(2026, 11, 1)
 sp = Provenance.seller_provided

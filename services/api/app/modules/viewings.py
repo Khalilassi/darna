@@ -16,7 +16,8 @@ from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.notify import notify
 from app.core.state_machine import StateMachine
 from app.models.entities import Listing, User, Viewing
-from app.models.enums import LISTING_PUBLIC_STATUSES, ViewingStatus as VS
+from app.models.enums import LISTING_PUBLIC_STATUSES
+from app.models.enums import ViewingStatus as VS
 from app.schemas.common import ORM
 
 router = APIRouter(prefix="/viewings", tags=["viewings"])

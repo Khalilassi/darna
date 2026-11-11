@@ -31,11 +31,13 @@ from app.models.entities import ChecklistItem, Deal, DealEvent, Document, Listin
 from app.models.enums import (
     ChecklistStatus,
     DealKind,
-    DealStatus as DS,
     ListingPurpose,
     ListingStatus,
     OfferStatus,
     PartyRole,
+)
+from app.models.enums import (
+    DealStatus as DS,
 )
 from app.modules import listings as listings_mod
 from app.modules.properties import approved_claim_for

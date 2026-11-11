@@ -38,6 +38,8 @@ from app.models.enums import (
     Role,
     SupportStatus,
     VerificationKind,
+)
+from app.models.enums import (
     VerificationStatus as VS,
 )
 from app.modules import listings as L

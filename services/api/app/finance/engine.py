@@ -28,7 +28,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import PaymentMode, Payer, Provenance
+from app.models.enums import Payer, PaymentMode, Provenance
 
 CENT = Decimal("0.01")
 ZERO = Decimal("0")

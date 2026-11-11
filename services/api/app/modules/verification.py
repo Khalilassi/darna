@@ -15,7 +15,8 @@ from app.core.deps import client_ip, current_user
 from app.core.errors import Conflict, ValidationFailed
 from app.core.state_machine import StateMachine
 from app.models.entities import User, VerificationRequest
-from app.models.enums import DocumentKind, VerificationKind, VerificationStatus as VS
+from app.models.enums import DocumentKind, VerificationKind
+from app.models.enums import VerificationStatus as VS
 from app.modules.documents import get_owned_documents
 from app.schemas.common import ORM
 

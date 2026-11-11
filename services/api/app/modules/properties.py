@@ -28,11 +28,18 @@ from app.core.deps import client_ip, current_user
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.notify import notify
 from app.core.state_machine import StateMachine
-from app.models.entities import District, Listing, OwnershipClaim, Property, PropertyDispute, User, VerificationRequest
+from app.models.entities import (
+    District,
+    Listing,
+    OwnershipClaim,
+    Property,
+    PropertyDispute,
+    User,
+    VerificationRequest,
+)
 from app.models.enums import (
     LISTING_OCCUPYING_STATUSES,
     ClaimCapacity,
-    ClaimStatus as CS,
     DeliveryStatus,
     DisputeStatus,
     DocumentKind,
@@ -42,6 +49,9 @@ from app.models.enums import (
     PropertyType,
     VerificationKind,
     VerificationStatus,
+)
+from app.models.enums import (
+    ClaimStatus as CS,
 )
 from app.modules.documents import get_owned_documents
 from app.schemas.common import ORM

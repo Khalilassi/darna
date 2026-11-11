@@ -13,12 +13,12 @@ os.environ["DARNA_RATE_LIMIT_ENABLED"] = "false"
 os.environ["DARNA_STORAGE_DIR"] = tempfile.mkdtemp(prefix="darna-test-")
 
 import pytest  # noqa: E402
-from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from alembic import command  # noqa: E402
 from app.core.db import Base, get_engine, session_factory  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.entities import District, Project, User  # noqa: E402

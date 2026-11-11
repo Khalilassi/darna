@@ -50,14 +50,16 @@ from app.models.enums import (
     DeliveryStatus,
     Finishing,
     ListingPurpose,
-    ListingStatus as LS,
     OfferStatus,
     Orientation,
-    PaymentMode,
     Payer,
+    PaymentMode,
     PropertyType,
     Provenance,
     ViewingStatus,
+)
+from app.models.enums import (
+    ListingStatus as LS,
 )
 from app.modules.properties import approved_claim_for
 from app.schemas.common import Ok, Page
