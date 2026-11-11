@@ -67,3 +67,9 @@ def client_ip(request: Request) -> str | None:
 
 def idempotency_key(idempotency_key: str | None = Header(default=None, max_length=80)) -> str | None:
     return idempotency_key
+
+
+def request_lang(request: Request) -> str:
+    """'ar' when the client prefers Arabic (Accept-Language), else 'en'."""
+    header = (request.headers.get("accept-language") or "").strip().lower()
+    return "ar" if header.startswith("ar") else "en"

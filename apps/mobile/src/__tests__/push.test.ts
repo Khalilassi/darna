@@ -35,10 +35,22 @@ describe("push data → route", () => {
     expect(pushDataToHref({ type: "offer_received", deal_id: id })).toBe(`/deal/${id}`);
     expect(pushDataToHref({ type: "viewing_requested", viewing_id: id })).toBe("/viewings");
     expect(pushDataToHref({ type: "listing_approved", listing_id: id })).toBe(`/owner/listing/${id}`);
-    expect(pushDataToHref({ type: "saved_search_match", listing_id: id })).toBe(`/listing/${id}`);
+    expect(pushDataToHref({ type: "price_drop", listing_id: id })).toBe(`/listing/${id}`);
     expect(pushDataToHref({ type: "ownership_claim_approved", property_id: id })).toBe("/owner");
     expect(pushDataToHref({ type: "verification_approved", verification_id: id })).toBe("/owner");
     expect(pushDataToHref({ type: "support_case_updated", case_id: id })).toBe("/support");
+  });
+  it("opens a saved search's results for saved-search alerts", () => {
+    expect(pushDataToHref({ type: "saved_search_match", saved_search_id: id, count: 3 })).toBe(`/saved-searches/${id}`);
+    expect(pushDataToHref({ type: "saved_search_match", saved_search_id: "../x" })).toBe("/saved-searches");
+    expect(pushDataToHref({ type: "saved_search_match" })).toBe("/saved-searches");
+  });
+  it("sends an account-lock security notice to the notifications list", () => {
+    expect(pushDataToHref({ type: "account_locked" })).toBe("/notifications");
+  });
+  it("lists the alerts category before support", () => {
+    expect(PUSH_CATEGORIES).toContain("alerts");
+    expect(PUSH_CATEGORIES.indexOf("alerts")).toBeLessThan(PUSH_CATEGORIES.indexOf("support"));
   });
   it("prefers the conversation for message pushes that also carry a deal", () => {
     expect(pushDataToHref({ type: "new_message", conversation_id: "c1", deal_id: "d1" })).toBe("/conversation/c1");

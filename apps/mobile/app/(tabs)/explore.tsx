@@ -5,11 +5,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, unwrap } from "../../src/api/client";
-import { useFavoriteIds, useNotifications, useProjects, useToggleFavorite } from "../../src/api/queries";
+import { errorMessage } from "../../src/api/errors";
+import { useCreateSavedSearch, useFavoriteIds, useNotifications, useProjects, useToggleFavorite } from "../../src/api/queries";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
-  Button, CompareBar, EmptyState, ErrorState, IconButton, ListingCard, LoadingState, Segmented, Select, T, TextField,
+  Button, CompareBar, EmptyState, ErrorState, IconButton, ListingCard, LoadingState, Notice, Segmented, Select, T, TextField,
 } from "../../src/components";
+import { SearchNameModal } from "../../src/features/SearchNameModal";
+import { describeFilters, toSearchFilters } from "../../src/lib/savedSearch";
 import { useLanguage } from "../../src/i18n/LanguageProvider";
 import { countActiveFilters, emptyFilters, SORT_KEYS, toListingQuery, useFilters, type SortKey } from "../../src/state/filters";
 import { useTheme } from "../../src/theme";
@@ -28,6 +31,9 @@ export default function Explore() {
   const toggleFav = useToggleFavorite();
   const notifications = useNotifications();
   const [q, setQ] = useState(filters.q ?? "");
+  const createSaved = useCreateSavedSearch();
+  const [saving, setSaving] = useState(false);
+  const [savedName, setSavedName] = useState<string | null>(null);
 
   // Default to the first active project.
   useEffect(() => {
@@ -53,6 +59,15 @@ export default function Explore() {
   const total = query.data?.pages[0]?.total ?? 0;
   const activeCount = countActiveFilters(filters);
   const project = projects.data?.find((p) => p.id === filters.project_id);
+
+  const district = project?.districts.find((d) => d.id === filters.district_id);
+  const defaultSearchName = describeFilters(filters, t, lang, { districtName: district ? (lang === "ar" ? district.name_ar : district.name_en) : null });
+  const openSave = () => {
+    if (status !== "signedIn") return router.push("/login");
+    createSaved.reset();
+    setSavedName(null);
+    setSaving(true);
+  };
 
   const onFavorite = (id: string) => {
     if (status !== "signedIn") return router.push("/login");
@@ -106,6 +121,16 @@ export default function Explore() {
         ]}
         testID="purpose-segment"
       />
+      <View style={styles.toolRow}>
+        <Button title={t("market.open")} icon="stats-chart-outline" variant="outline" size="sm" onPress={() => router.push(filters.purpose ? `/market?purpose=${filters.purpose}` : "/market")} style={{ flex: 1 }} testID="open-market" />
+        <Button title={t("savedSearch.save")} icon="bookmark-outline" variant="outline" size="sm" onPress={openSave} style={{ flex: 1 }} testID="save-search" />
+      </View>
+      {savedName ? (
+        <Notice tone="success" testID="search-saved">
+          <T variant="caption">{t("savedSearch.savedAs", { name: savedName })}</T>
+          <Button title={t("savedSearch.viewAll")} variant="ghost" size="sm" onPress={() => router.push("/saved-searches")} style={{ alignSelf: "flex-start" }} testID="view-saved-searches" />
+        </Notice>
+      ) : null}
       <View style={styles.toolRow}>
         <Button
           title={activeCount ? t("explore.filtersCount", { count: activeCount }) : t("explore.filters")}
@@ -185,6 +210,26 @@ export default function Explore() {
         }
       />
       <CompareBar />
+      <SearchNameModal
+        visible={saving}
+        title={t("savedSearch.saveTitle")}
+        initialName={defaultSearchName}
+        withAlerts
+        busy={createSaved.isPending}
+        error={createSaved.isError ? errorMessage(createSaved.error, t) : null}
+        onCancel={() => setSaving(false)}
+        onSubmit={(name, alerts) =>
+          createSaved.mutate(
+            { name, filters: toSearchFilters(filters), alerts_enabled: alerts },
+            {
+              onSuccess: (s) => {
+                setSaving(false);
+                setSavedName(s.name);
+              },
+            },
+          )
+        }
+      />
     </SafeAreaView>
   );
 }

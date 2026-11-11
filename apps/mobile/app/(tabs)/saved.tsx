@@ -3,18 +3,36 @@ import { FlatList, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import { useFavorites, useToggleFavorite } from "../../src/api/queries";
-import { Button, EmptyState, ErrorState, ListingCard, LoadingState, SignInRequired, T } from "../../src/components";
+import { useAuth } from "../../src/auth/AuthProvider";
+import { useFavorites, useSavedSearches, useToggleFavorite } from "../../src/api/queries";
+import { Badge, Button, EmptyState, ErrorState, ListingCard, LoadingState, Row, SignInRequired, T } from "../../src/components";
 import { MAX_COMPARE, useCompare } from "../../src/state/compare";
 import { useTheme } from "../../src/theme";
 
 export default function Saved() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const router = useRouter();
+  const { status } = useAuth();
+  const searches = useSavedSearches();
+  const newMatches = (searches.data ?? []).reduce((n, s) => n + s.new_since_last_alert, 0);
   return (
     <SafeAreaView edges={["top"]} style={[styles.flex, { backgroundColor: colors.background }]}>
       <View style={styles.head}>
         <T variant="title" accessibilityRole="header">{t("saved.title")}</T>
+        {status === "signedIn" ? (
+          <Row>
+            <Button
+              title={searches.data?.length ? t("savedSearch.linkCount", { count: searches.data.length }) : t("savedSearch.title")}
+              icon="bookmark-outline"
+              variant="secondary"
+              size="sm"
+              onPress={() => router.push("/saved-searches")}
+              testID="open-saved-searches"
+            />
+            {newMatches ? <Badge tone="primary" label={t("savedSearch.newCount", { count: newMatches })} /> : null}
+          </Row>
+        ) : null}
       </View>
       <SignInRequired icon="heart-outline">
         <SavedList />
@@ -94,6 +112,6 @@ function SavedList() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  head: { paddingHorizontal: 16, paddingTop: 8 },
+  head: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
   footer: { position: "absolute", bottom: 12, start: 16, end: 16 },
 });

@@ -18,9 +18,12 @@ from app.modules import (
     deals,
     documents,
     listings,
+    market,
     messaging,
     notifications,
+    phone,
     properties,
+    saved_searches,
     support,
     verification,
     viewings,
@@ -59,12 +62,13 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
-    for r in (auth, catalog, documents, verification, properties, listings, messaging, viewings, deals, notifications, support, admin):
+    for r in (auth, phone, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
 
-    media = settings.storage_dir / "public"
-    media.mkdir(parents=True, exist_ok=True)
-    app.mount("/media", StaticFiles(directory=media), name="media")
+    if settings.storage_backend == "local":  # with s3, photos are served by the CDN / bucket
+        media = settings.storage_dir / "public"
+        media.mkdir(parents=True, exist_ok=True)
+        app.mount("/media", StaticFiles(directory=media), name="media")
 
     @app.get("/health", tags=["meta"])
     def health():

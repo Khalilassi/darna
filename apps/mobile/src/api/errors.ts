@@ -11,6 +11,10 @@ export function errorMessage(err: unknown, t: TFunction): string {
       const general = generalValidationMessage(err);
       if (general && i18next.language !== "ar") return general;
     }
+    if (err.code === "too_many_failed_logins") {
+      const minutes = lockoutMinutes(err);
+      return minutes === null ? t("errors.too_many_failed_logins") : t("errors.lockedMinutes", { count: minutes });
+    }
     const key = `errors.${err.code}`;
     const msg = t(key, { defaultValue: "" });
     if (msg) return msg;
@@ -52,4 +56,10 @@ export function fieldErrors(err: unknown): Record<string, string> {
 function generalValidationMessage(err: ApiError): string | null {
   const general = details(err).find((d) => (d.loc ?? []).filter((p) => p !== "body").length === 0 && d.msg);
   return general?.msg ? general.msg.replace(/^Value error, /, "") : null;
+}
+
+/** Whole minutes left on a sign-in lockout (`details.retry_after_seconds`), rounded up; null when absent. */
+export function lockoutMinutes(err: ApiError): number | null {
+  const secs = (err.details as { retry_after_seconds?: unknown } | undefined)?.retry_after_seconds;
+  return typeof secs === "number" && Number.isFinite(secs) && secs >= 0 ? Math.max(1, Math.ceil(secs / 60)) : null;
 }

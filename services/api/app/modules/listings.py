@@ -16,8 +16,9 @@ from app.core import rate_limit
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
-from app.core.deps import client_ip, current_user, current_user_optional
+from app.core.deps import client_ip, current_user, current_user_optional, request_lang
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from app.core.scanning import ensure_clean
 from app.core.state_machine import StateMachine
 from app.core.storage import public_storage
 from app.finance.engine import (
@@ -140,6 +141,7 @@ class ListingCard(BaseModel):
     project_id: uuid.UUID
     project_name_en: str
     project_name_ar: str
+    district_id: uuid.UUID
     district_name_en: str
     district_name_ar: str
     group_code: str
@@ -259,7 +261,7 @@ def _card(listing: Listing) -> dict:
     return dict(
         id=listing.id, title=listing.title, purpose=listing.purpose, status=listing.status,
         project_id=prop.project_id, project_name_en=prop.project.name_en, project_name_ar=prop.project.name_ar,
-        district_name_en=prop.district.name_en, district_name_ar=prop.district.name_ar, group_code=prop.group_code,
+        district_id=prop.district_id, district_name_en=prop.district.name_en, district_name_ar=prop.district.name_ar, group_code=prop.group_code,
         property_type=prop.property_type, area_sqm=prop.area_sqm, bedrooms=prop.bedrooms, bathrooms=prop.bathrooms,
         floor=prop.floor, finishing=prop.finishing, delivery_status=prop.delivery_status, orientation=prop.orientation,
         furnished=listing.furnished, cover_photo_url=public_storage().url(cover.storage_key) if cover else None,
@@ -342,6 +344,10 @@ def transition(db: Session, listing: Listing, target: LS, actor: User | None, ip
     listing.status = target
     if target == LS.active and listing.published_at is None:
         listing.published_at = utcnow()
+    if target in (LS.active, LS.sold, LS.rented):
+        from app.modules.market import record_price_event
+
+        record_price_event(db, listing, closed=target != LS.active)
     if note is not None:
         listing.moderation_note = note
     audit(db, "listing.status_changed", "listing", listing.id, actor_id=actor.id if actor else None,
@@ -473,6 +479,7 @@ async def upload_photo(listing_id: uuid.UUID, file: UploadFile = File(...), user
     data = await file.read(get_settings().max_upload_bytes + 1)
     if len(data) > get_settings().max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
+    ensure_clean(data)
     key, w, h = public_storage().put_image(data)
     photo = ListingPhoto(listing_id=listing.id, storage_key=key, width=w, height=h, position=count)
     db.add(photo)
@@ -503,6 +510,105 @@ def delete_photo(listing_id: uuid.UUID, photo_id: uuid.UUID, user: User = Depend
 SortKey = Literal["newest", "price_asc", "price_desc", "area_desc", "ppsqm_asc"]
 
 
+class SearchFilters(BaseModel):
+    """Every search filter. Shared by public search, saved searches and saved-search alerts."""
+
+    project_id: uuid.UUID | None = None
+    district_id: uuid.UUID | None = None
+    group_code: str | None = Field(default=None, max_length=20)
+    purpose: Literal["sale", "rent"] | None = None
+    property_type: list[PropertyType] = Field(default_factory=list)
+    bedrooms_min: int | None = Field(default=None, ge=0)
+    bedrooms_max: int | None = Field(default=None, ge=0)
+    bathrooms_min: int | None = Field(default=None, ge=0)
+    area_min: Decimal | None = Field(default=None, ge=0)
+    area_max: Decimal | None = Field(default=None, ge=0)
+    price_min: Decimal | None = Field(default=None, ge=0)
+    price_max: Decimal | None = Field(default=None, ge=0)
+    floor_min: int | None = None
+    floor_max: int | None = None
+    finishing: list[Finishing] = Field(default_factory=list)
+    delivery_status: DeliveryStatus | None = None
+    orientation: list[Orientation] = Field(default_factory=list)
+    payment_mode: PaymentMode | None = None
+    furnished: bool | None = None
+    q: str | None = Field(default=None, max_length=80)
+
+
+def search_conditions(f: SearchFilters):
+    """Return (SQL conditions, price column) for public listings matching ``f``."""
+    conds = [Listing.status.in_(LISTING_PUBLIC_STATUSES)]
+    if f.project_id:
+        conds.append(Property.project_id == f.project_id)
+    if f.district_id:
+        conds.append(Property.district_id == f.district_id)
+    if f.group_code:
+        from app.modules.properties import normalize_segment
+        conds.append(Property.group_code == normalize_segment(f.group_code))
+    price_col = Listing.sale_cash_price
+    if f.purpose == "sale":
+        conds.append(Listing.purpose.in_([ListingPurpose.sale, ListingPurpose.sale_and_rent]))
+    elif f.purpose == "rent":
+        conds.append(Listing.purpose.in_([ListingPurpose.rent, ListingPurpose.sale_and_rent]))
+        price_col = Listing.monthly_rent
+    if f.property_type:
+        conds.append(Property.property_type.in_(f.property_type))
+    if f.bedrooms_min is not None:
+        conds.append(Property.bedrooms >= f.bedrooms_min)
+    if f.bedrooms_max is not None:
+        conds.append(Property.bedrooms <= f.bedrooms_max)
+    if f.bathrooms_min is not None:
+        conds.append(Property.bathrooms >= f.bathrooms_min)
+    if f.area_min is not None:
+        conds.append(Property.area_sqm >= f.area_min)
+    if f.area_max is not None:
+        conds.append(Property.area_sqm <= f.area_max)
+    if f.price_min is not None:
+        conds.append(price_col >= f.price_min)
+    if f.price_max is not None:
+        conds.append(price_col <= f.price_max)
+    if f.floor_min is not None:
+        conds.append(Property.floor >= f.floor_min)
+    if f.floor_max is not None:
+        conds.append(Property.floor <= f.floor_max)
+    if f.finishing:
+        conds.append(Property.finishing.in_(f.finishing))
+    if f.delivery_status:
+        conds.append(Property.delivery_status == f.delivery_status)
+    if f.orientation:
+        conds.append(Property.orientation.in_(f.orientation))
+    if f.payment_mode:
+        conds.append(Listing.sale_payment_mode == f.payment_mode.value)
+    if f.furnished is not None:
+        conds.append(Listing.furnished.is_(f.furnished))
+    if f.q:
+        like = f"%{f.q.replace('%', '').replace('_', '')}%"
+        conds.append(or_(Listing.title.ilike(like), Listing.description.ilike(like)))
+    return conds, price_col
+
+
+def run_search(db: Session, f: SearchFilters, sort: SortKey = "newest", page: int = 1, page_size: int = 20) -> Page[ListingCard]:
+    conds, price_col = search_conditions(f)
+    base = select(Listing).join(Property, Listing.property_id == Property.id).where(and_(*conds))
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    featured_first = (Listing.featured_until > func.now()).desc().nulls_last()
+    order = {
+        "newest": [featured_first, Listing.published_at.desc().nulls_last()],
+        "price_asc": [price_col.asc().nulls_last()],
+        "price_desc": [price_col.desc().nulls_last()],
+        "area_desc": [Property.area_sqm.desc()],
+        "ppsqm_asc": [(Listing.sale_known_total / Property.area_sqm).asc().nulls_last()],
+    }[sort]
+    rows = db.scalars(
+        base.options(
+            joinedload(Listing.property).joinedload(Property.project),
+            joinedload(Listing.property).joinedload(Property.district),
+            joinedload(Listing.owner), selectinload(Listing.photos),
+        ).order_by(*order, Listing.id).offset((page - 1) * page_size).limit(page_size)
+    ).unique().all()
+    return Page(items=[ListingCard(**_card(r)) for r in rows], total=total, page=page, page_size=page_size)
+
+
 @router.get("", response_model=Page[ListingCard])
 def search(
     db: Session = Depends(get_db),
@@ -530,72 +636,14 @@ def search(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50),
 ):
-    conds = [Listing.status.in_(LISTING_PUBLIC_STATUSES)]
-    if project_id:
-        conds.append(Property.project_id == project_id)
-    if district_id:
-        conds.append(Property.district_id == district_id)
-    if group_code:
-        from app.modules.properties import normalize_segment
-        conds.append(Property.group_code == normalize_segment(group_code))
-    price_col = Listing.sale_cash_price
-    if purpose == "sale":
-        conds.append(Listing.purpose.in_([ListingPurpose.sale, ListingPurpose.sale_and_rent]))
-    elif purpose == "rent":
-        conds.append(Listing.purpose.in_([ListingPurpose.rent, ListingPurpose.sale_and_rent]))
-        price_col = Listing.monthly_rent
-    if property_type:
-        conds.append(Property.property_type.in_(property_type))
-    if bedrooms_min is not None:
-        conds.append(Property.bedrooms >= bedrooms_min)
-    if bedrooms_max is not None:
-        conds.append(Property.bedrooms <= bedrooms_max)
-    if bathrooms_min is not None:
-        conds.append(Property.bathrooms >= bathrooms_min)
-    if area_min is not None:
-        conds.append(Property.area_sqm >= area_min)
-    if area_max is not None:
-        conds.append(Property.area_sqm <= area_max)
-    if price_min is not None:
-        conds.append(price_col >= price_min)
-    if price_max is not None:
-        conds.append(price_col <= price_max)
-    if floor_min is not None:
-        conds.append(Property.floor >= floor_min)
-    if floor_max is not None:
-        conds.append(Property.floor <= floor_max)
-    if finishing:
-        conds.append(Property.finishing.in_(finishing))
-    if delivery_status:
-        conds.append(Property.delivery_status == delivery_status)
-    if orientation:
-        conds.append(Property.orientation.in_(orientation))
-    if payment_mode:
-        conds.append(Listing.sale_payment_mode == payment_mode.value)
-    if furnished is not None:
-        conds.append(Listing.furnished.is_(furnished))
-    if q:
-        like = f"%{q.replace('%', '').replace('_', '')}%"
-        conds.append(or_(Listing.title.ilike(like), Listing.description.ilike(like)))
-
-    base = select(Listing).join(Property, Listing.property_id == Property.id).where(and_(*conds))
-    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
-    featured_first = (Listing.featured_until > func.now()).desc().nulls_last()
-    order = {
-        "newest": [featured_first, Listing.published_at.desc().nulls_last()],
-        "price_asc": [price_col.asc().nulls_last()],
-        "price_desc": [price_col.desc().nulls_last()],
-        "area_desc": [Property.area_sqm.desc()],
-        "ppsqm_asc": [(Listing.sale_known_total / Property.area_sqm).asc().nulls_last()],
-    }[sort]
-    rows = db.scalars(
-        base.options(
-            joinedload(Listing.property).joinedload(Property.project),
-            joinedload(Listing.property).joinedload(Property.district),
-            joinedload(Listing.owner), selectinload(Listing.photos),
-        ).order_by(*order, Listing.id).offset((page - 1) * page_size).limit(page_size)
-    ).unique().all()
-    return Page(items=[ListingCard(**_card(r)) for r in rows], total=total, page=page, page_size=page_size)
+    f = SearchFilters(
+        project_id=project_id, district_id=district_id, group_code=group_code, purpose=purpose, property_type=property_type,
+        bedrooms_min=bedrooms_min, bedrooms_max=bedrooms_max, bathrooms_min=bathrooms_min, area_min=area_min,
+        area_max=area_max, price_min=price_min, price_max=price_max, floor_min=floor_min, floor_max=floor_max,
+        finishing=finishing, delivery_status=delivery_status, orientation=orientation, payment_mode=payment_mode,
+        furnished=furnished, q=q,
+    )
+    return run_search(db, f, sort, page, page_size)
 
 
 @router.get("/compare", response_model=list[ListingDetail])
@@ -638,14 +686,14 @@ class ScenarioOut(BaseModel):
 
 
 @router.get("/{listing_id}/financials", response_model=ScenarioOut)
-def financial_scenario(listing_id: uuid.UUID, as_of: date | None = None, discount_rate: Decimal | None = Query(default=None, ge=0, le=1), db: Session = Depends(get_db)):
+def financial_scenario(request: Request, listing_id: uuid.UUID, as_of: date | None = None, discount_rate: Decimal | None = Query(default=None, ge=0, le=1), db: Session = Depends(get_db)):
     listing = _load(db, listing_id)
     if listing.status not in LISTING_PUBLIC_STATUSES or not listing.sale_terms:
         raise NotFound("No sale financials for this listing")
     as_of = as_of or date.today()
     sale = _sale_input(listing, listing.property)
     assert sale is not None
-    pv = present_value(sale.installments, as_of, discount_rate) if discount_rate is not None else None
+    pv = present_value(sale.installments, as_of, discount_rate, request_lang(request)) if discount_rate is not None else None
     return ScenarioOut(sale_breakdown=compute_sale(sale, as_of), present_value=pv)
 
 

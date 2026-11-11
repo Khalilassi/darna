@@ -1,4 +1,4 @@
-"""Scheduled maintenance jobs.
+"""Scheduled maintenance jobs (offers, retention, featuring, saved-search alerts, token cleanup).
 
 Run once (e.g. from cron / a platform scheduler):   python -m app.worker --once
 Run as a long-lived process:                         python -m app.worker --interval 300
@@ -23,6 +23,7 @@ from app.core.db import session_factory, utcnow
 from app.core.storage import private_storage
 from app.models.entities import Document, IdempotencyRecord, Listing, RefreshToken, VerificationRequest
 from app.modules.deals import expire_all_offers
+from app.modules.saved_searches import send_alerts
 
 log = logging.getLogger("darna.worker")
 
@@ -35,6 +36,7 @@ class JobReport:
     offers_expired: int = 0
     documents_purged: int = 0
     featured_cleared: int = 0
+    saved_search_alerts: int = 0
     refresh_tokens_deleted: int = 0
     idempotency_records_deleted: int = 0
 
@@ -90,6 +92,7 @@ def run_once(db: Session | None = None) -> JobReport:
             ("offers", lambda: setattr(report, "offers_expired", expire_all_offers(db))),
             ("documents", lambda: setattr(report, "documents_purged", purge_documents(db))),
             ("featured", lambda: setattr(report, "featured_cleared", clear_expired_featuring(db))),
+            ("alerts", lambda: setattr(report, "saved_search_alerts", send_alerts(db))),
             ("tokens", lambda: _tokens(db, report)),
         ):
             try:

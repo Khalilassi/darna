@@ -8,7 +8,7 @@ export const PUSH_TOKEN_RE = /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+
 export const isValidPushToken = (token: unknown): token is string => typeof token === "string" && PUSH_TOKEN_RE.test(token);
 
 /** Push categories the API accepts in `/notifications/preferences` (display order). */
-export const PUSH_CATEGORIES = ["messages", "offers", "deals", "viewings", "verification", "listings", "support"] as const;
+export const PUSH_CATEGORIES = ["messages", "offers", "deals", "viewings", "verification", "listings", "alerts", "support"] as const;
 export type PushCategory = (typeof PUSH_CATEGORIES)[number];
 
 /**
@@ -48,7 +48,8 @@ const idOf = (data: Record<string, unknown>, key: string): string | null => {
 /**
  * Route for a tapped push, from its `data` ({type, ...*_id}). Messages go to the chat, deal events to
  * the deal workspace, viewing events to the viewings list, listing events (approved / rejected /
- * suspended are sent to the owner) to the owner's listing management screen.
+ * suspended are sent to the owner) to the owner's listing management screen, saved-search alerts to
+ * that search's results, and an account lock (security notice) to the in-app notifications list.
  */
 export function pushDataToHref(raw: unknown): string | null {
   if (!raw || typeof raw !== "object") return null;
@@ -59,6 +60,10 @@ export function pushDataToHref(raw: unknown): string | null {
   const deal = idOf(data, "deal_id");
   if (deal) return `/deal/${deal}`;
   if (idOf(data, "viewing_id")) return "/viewings";
+  const savedSearch = idOf(data, "saved_search_id");
+  if (savedSearch) return `/saved-searches/${savedSearch}`;
+  if (type === "saved_search_match") return "/saved-searches";
+  if (type === "account_locked") return "/notifications";
   const listing = idOf(data, "listing_id");
   if (listing) return type.startsWith("listing_") ? `/owner/listing/${listing}` : `/listing/${listing}`;
   if (idOf(data, "property_id") || idOf(data, "verification_id") || type.startsWith("ownership") || type.startsWith("verification")) return "/owner";

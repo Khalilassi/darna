@@ -28,6 +28,7 @@ from app.models.entities import (
     Document,
     Listing,
     ListingPhoto,
+    ListingPriceEvent,
     Message,
     Offer,
     OwnershipClaim,
@@ -197,12 +198,13 @@ def main(reset: bool) -> None:
 
     mad = districts["madinaty"]
     created = 0
-    for i in range(24):
+    for i in range(30):
         owner = owners[i % len(owners)]
         ptype = rng.choices([PropertyType.apartment, PropertyType.duplex, PropertyType.penthouse, PropertyType.villa,
                              PropertyType.townhouse], weights=[10, 2, 1, 2, 2])[0]
         detached = ptype in (PropertyType.villa, PropertyType.townhouse)
-        district = mad[-1] if detached else rng.choice(mad[:-1])
+        # Apartments concentrate in four districts so market summaries have enough samples to show.
+        district = mad[-1] if detached else rng.choice(mad[:4])
         beds = {PropertyType.villa: 4, PropertyType.townhouse: 3, PropertyType.penthouse: 3, PropertyType.duplex: 4}.get(ptype, rng.choice([2, 3, 3, 4]))
         area = Decimal({PropertyType.villa: rng.randint(280, 420), PropertyType.townhouse: rng.randint(220, 300)}.get(ptype, rng.randint(85, 230)))
         group, building = str(rng.randint(1, 140)), (f"V{rng.randint(1, 600)}" if detached else str(rng.randint(1, 60)))
@@ -237,6 +239,10 @@ def main(reset: bool) -> None:
         _refresh_denormalized(listing)
         db.add(listing)
         db.flush()
+        db.add(ListingPriceEvent(listing_id=listing.id, property_id=prop.id, project_id=prop.project_id, district_id=prop.district_id,
+                                 property_type=prop.property_type, area_sqm=prop.area_sqm, kind="listed",
+                                 sale_cash_price=listing.sale_cash_price, sale_known_total=listing.sale_known_total,
+                                 monthly_rent=listing.monthly_rent, created_at=listing.published_at))
         for pos in range(rng.randint(3, 5)):
             key, w, h = public_storage().put_image(synthetic_photo(i * 10 + pos))
             db.add(ListingPhoto(listing_id=listing.id, storage_key=key, width=w, height=h, position=pos))

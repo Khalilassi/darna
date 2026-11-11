@@ -16,3 +16,4 @@ export * from "./DocumentUploader";
 export * from "./SignInRequired";
 export * from "./CompareBar";
 export * from "./DateField";
+export * from "./MiniBars";

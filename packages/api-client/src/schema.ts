@@ -368,6 +368,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/phone/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_auth_phone_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/phone/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify */
+        post: operations["verify_auth_phone_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -833,6 +867,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/listings/{listing_id}/financials/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare */
+        get: operations["compare_listings__listing_id__financials_compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/listings/{listing_id}/photos": {
         parameters: {
             query?: never;
@@ -862,6 +913,40 @@ export interface paths {
         post?: never;
         /** Delete Photo */
         delete: operations["delete_photo_listings__listing_id__photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/listings/{listing_id}/price-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Price History */
+        get: operations["price_history_listings__listing_id__price_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/market/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Market Summary */
+        get: operations["market_summary_market_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1039,6 +1124,59 @@ export interface paths {
         put?: never;
         /** Claim Property */
         post: operations["claim_property_properties__property_id__claims_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Saved */
+        get: operations["list_saved_saved_searches_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_saved_searches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-searches/{saved_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete */
+        delete: operations["delete_saved_searches__saved_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update */
+        patch: operations["update_saved_searches__saved_id__patch"];
+        trace?: never;
+    };
+    "/saved-searches/{saved_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Results */
+        get: operations["results_saved_searches__saved_id__results_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1450,6 +1588,33 @@ export interface components {
             resolution_note?: string | null;
             status?: components["schemas"]["SupportStatus"] | null;
         };
+        /** CashComparison */
+        CashComparison: {
+            /** Annual Discount Rate */
+            annual_discount_rate: string;
+            /** Assumption */
+            assumption: string;
+            /** Break Even Cash Price */
+            break_even_cash_price: string;
+            /** Cash Alternative */
+            cash_alternative: string | null;
+            /** Cheaper Option */
+            cheaper_option: ("installments" | "cash" | "equal") | null;
+            /** Excludes Estimates And Unknowns */
+            excludes_estimates_and_unknowns: boolean;
+            /** Future Nominal */
+            future_nominal: string;
+            /** Future Present Value */
+            future_present_value: string;
+            /** Initial Cash */
+            initial_cash: string;
+            /** Nominal Total */
+            nominal_total: string;
+            /** Present Value Difference */
+            present_value_difference: string | null;
+            /** Present Value Total */
+            present_value_total: string;
+        };
         /** ChecklistOut */
         ChecklistOut: {
             /** Code */
@@ -1750,6 +1915,22 @@ export interface components {
             /** Name En */
             name_en: string;
         };
+        /** DistrictSummary */
+        DistrictSummary: {
+            /** Active Listings */
+            active_listings: number;
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
+            /** District Name Ar */
+            district_name_ar: string;
+            /** District Name En */
+            district_name_en: string;
+            rent: components["schemas"]["Figure"];
+            sale: components["schemas"]["Figure"];
+        };
         /** DocRef */
         DocRef: {
             /** Content Type */
@@ -1861,6 +2042,13 @@ export interface components {
             /** @default buyer */
             payer: components["schemas"]["Payer"];
             value: components["schemas"]["Amount-Output"];
+        };
+        /** Figure */
+        Figure: {
+            /** Median Per Sqm */
+            median_per_sqm: string | null;
+            /** Sample Size */
+            sample_size: number;
         };
         /** FinancialVerificationIn */
         FinancialVerificationIn: {
@@ -1982,6 +2170,11 @@ export interface components {
             /** Cover Photo Url */
             cover_photo_url: string | null;
             delivery_status: components["schemas"]["DeliveryStatus"];
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -2047,6 +2240,11 @@ export interface components {
             delivery_status: components["schemas"]["DeliveryStatus"];
             /** Description */
             description: string;
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -2176,6 +2374,37 @@ export interface components {
             /** Totp Code */
             totp_code?: string | null;
         };
+        /** MarketSummary */
+        MarketSummary: {
+            /** Districts */
+            districts: components["schemas"]["DistrictSummary"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Methodology */
+            methodology: string;
+            /**
+             * Min Sample
+             * @default 3
+             */
+            min_sample: number;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Property Types */
+            property_types: components["schemas"]["PropertyType"][];
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "sale" | "rent";
+            /** Trend */
+            trend: components["schemas"]["TrendPoint"][];
+        };
         /** MeDetailOut */
         MeDetailOut: {
             /**
@@ -2200,6 +2429,8 @@ export interface components {
             mfa_enabled_at: string | null;
             /** Phone */
             phone: string | null;
+            /** Phone Verified At */
+            phone_verified_at: string | null;
             role: components["schemas"]["Role"];
             verification: components["schemas"]["VerificationSummary"];
         };
@@ -2227,6 +2458,8 @@ export interface components {
             mfa_enabled_at: string | null;
             /** Phone */
             phone: string | null;
+            /** Phone Verified At */
+            phone_verified_at: string | null;
             role: components["schemas"]["Role"];
         };
         /** MeUpdate */
@@ -2443,6 +2676,11 @@ export interface components {
             delivery_status: components["schemas"]["DeliveryStatus"];
             /** Description */
             description: string;
+            /**
+             * District Id
+             * Format: uuid
+             */
+            district_id: string;
             /** District Name Ar */
             district_name_ar: string;
             /** District Name En */
@@ -2641,6 +2879,22 @@ export interface components {
             present_value: string;
             /** Saving Vs Nominal */
             saving_vs_nominal: string;
+        };
+        /** PricePoint */
+        PricePoint: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Kind */
+            kind: string;
+            /** Monthly Rent */
+            monthly_rent: string | null;
+            /** Sale Cash Price */
+            sale_cash_price: string | null;
+            /** Sale Known Total */
+            sale_known_total: string | null;
         };
         /** ProjectOut */
         ProjectOut: {
@@ -3026,6 +3280,45 @@ export interface components {
             paid_to_developer?: components["schemas"]["Amount-Output"] | null;
             payment_mode: components["schemas"]["PaymentMode"];
         };
+        /** SavedSearchIn */
+        SavedSearchIn: {
+            /**
+             * Alerts Enabled
+             * @default true
+             */
+            alerts_enabled: boolean;
+            filters: components["schemas"]["SearchFilters-Input"];
+            /** Name */
+            name: string;
+        };
+        /** SavedSearchOut */
+        SavedSearchOut: {
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            filters: components["schemas"]["SearchFilters-Output"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** New Since Last Alert */
+            new_since_last_alert: number;
+        };
+        /** SavedSearchUpdate */
+        SavedSearchUpdate: {
+            /** Alerts Enabled */
+            alerts_enabled?: boolean | null;
+            filters?: components["schemas"]["SearchFilters-Input"] | null;
+            /** Name */
+            name?: string | null;
+        };
         /** ScenarioOut */
         ScenarioOut: {
             present_value: components["schemas"]["PresentValue"] | null;
@@ -3041,6 +3334,94 @@ export interface components {
             total: string;
             /** Year */
             year: number;
+        };
+        /**
+         * SearchFilters
+         * @description Every search filter. Shared by public search, saved searches and saved-search alerts.
+         */
+        "SearchFilters-Input": {
+            /** Area Max */
+            area_max?: number | string | null;
+            /** Area Min */
+            area_min?: number | string | null;
+            /** Bathrooms Min */
+            bathrooms_min?: number | null;
+            /** Bedrooms Max */
+            bedrooms_max?: number | null;
+            /** Bedrooms Min */
+            bedrooms_min?: number | null;
+            delivery_status?: components["schemas"]["DeliveryStatus"] | null;
+            /** District Id */
+            district_id?: string | null;
+            /** Finishing */
+            finishing?: components["schemas"]["Finishing"][];
+            /** Floor Max */
+            floor_max?: number | null;
+            /** Floor Min */
+            floor_min?: number | null;
+            /** Furnished */
+            furnished?: boolean | null;
+            /** Group Code */
+            group_code?: string | null;
+            /** Orientation */
+            orientation?: components["schemas"]["Orientation"][];
+            payment_mode?: components["schemas"]["PaymentMode"] | null;
+            /** Price Max */
+            price_max?: number | string | null;
+            /** Price Min */
+            price_min?: number | string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Property Type */
+            property_type?: components["schemas"]["PropertyType"][];
+            /** Purpose */
+            purpose?: ("sale" | "rent") | null;
+            /** Q */
+            q?: string | null;
+        };
+        /**
+         * SearchFilters
+         * @description Every search filter. Shared by public search, saved searches and saved-search alerts.
+         */
+        "SearchFilters-Output": {
+            /** Area Max */
+            area_max?: string | null;
+            /** Area Min */
+            area_min?: string | null;
+            /** Bathrooms Min */
+            bathrooms_min?: number | null;
+            /** Bedrooms Max */
+            bedrooms_max?: number | null;
+            /** Bedrooms Min */
+            bedrooms_min?: number | null;
+            delivery_status?: components["schemas"]["DeliveryStatus"] | null;
+            /** District Id */
+            district_id?: string | null;
+            /** Finishing */
+            finishing?: components["schemas"]["Finishing"][];
+            /** Floor Max */
+            floor_max?: number | null;
+            /** Floor Min */
+            floor_min?: number | null;
+            /** Furnished */
+            furnished?: boolean | null;
+            /** Group Code */
+            group_code?: string | null;
+            /** Orientation */
+            orientation?: components["schemas"]["Orientation"][];
+            payment_mode?: components["schemas"]["PaymentMode"] | null;
+            /** Price Max */
+            price_max?: string | null;
+            /** Price Min */
+            price_min?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Property Type */
+            property_type?: components["schemas"]["PropertyType"][];
+            /** Purpose */
+            purpose?: ("sale" | "rent") | null;
+            /** Q */
+            q?: string | null;
         };
         /** SentOut */
         SentOut: {
@@ -3060,15 +3441,17 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** StartIn */
-        StartIn: {
+        /** StartOut */
+        StartOut: {
             /**
-             * Listing Id
-             * Format: uuid
+             * Expires At
+             * Format: date-time
              */
-            listing_id: string;
-            /** Message */
-            message: string;
+            expires_at: string;
+            /** Phone */
+            phone: string;
+            /** Resend After Seconds */
+            resend_after_seconds: number;
         };
         /**
          * SupportCategory
@@ -3093,6 +3476,15 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /** TrendPoint */
+        TrendPoint: {
+            /** Median Per Sqm */
+            median_per_sqm: string | null;
+            /** Month */
+            month: string;
+            /** Sample Size */
+            sample_size: number;
         };
         /** UserUpdate */
         UserUpdate: {
@@ -3167,6 +3559,11 @@ export interface components {
             information_submitted: boolean;
             /** Pending Ownership Claims */
             pending_ownership_claims: number;
+        };
+        /** VerifyIn */
+        VerifyIn: {
+            /** Code */
+            code: string;
         };
         /** ViewingAction */
         ViewingAction: {
@@ -3271,6 +3668,21 @@ export interface components {
              */
             requester_id: string;
             status: components["schemas"]["ViewingStatus"];
+        };
+        /** StartIn */
+        app__modules__messaging__StartIn: {
+            /**
+             * Listing Id
+             * Format: uuid
+             */
+            listing_id: string;
+            /** Message */
+            message: string;
+        };
+        /** StartIn */
+        app__modules__phone__StartIn: {
+            /** Phone */
+            phone: string;
         };
     };
     responses: never;
@@ -3946,6 +4358,72 @@ export interface operations {
             };
         };
     };
+    start_auth_phone_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__phone__StartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_auth_phone_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_auth_refresh_post: {
         parameters: {
             query?: never;
@@ -4041,7 +4519,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StartIn"];
+                "application/json": components["schemas"]["app__modules__messaging__StartIn"];
             };
         };
         responses: {
@@ -4988,6 +5466,41 @@ export interface operations {
             };
         };
     };
+    compare_listings__listing_id__financials_compare_get: {
+        parameters: {
+            query: {
+                discount_rate: number | string;
+                cash_price?: number | string | null;
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_photo_listings__listing_id__photos_post: {
         parameters: {
             query?: never;
@@ -5042,6 +5555,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    price_history_listings__listing_id__price_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    market_summary_market_summary_get: {
+        parameters: {
+            query: {
+                project_id: string;
+                purpose?: "sale" | "rent";
+                district_id?: string | null;
+                property_type?: components["schemas"]["PropertyType"][];
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketSummary"];
                 };
             };
             /** @description Validation Error */
@@ -5382,6 +5961,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClaimOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_saved_searches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"][];
+                };
+            };
+        };
+    };
+    create_saved_searches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_saved_searches__saved_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saved_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_saved_searches__saved_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saved_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    results_saved_searches__saved_id__results_get: {
+        parameters: {
+            query?: {
+                sort?: "newest" | "price_asc" | "price_desc" | "area_desc" | "ppsqm_asc";
+                page?: number;
+                page_size?: number;
+                mark_seen?: boolean;
+            };
+            header?: never;
+            path: {
+                saved_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ListingCard_"];
                 };
             };
             /** @description Validation Error */

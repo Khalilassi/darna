@@ -9,8 +9,6 @@ import struct
 import time
 from urllib.parse import quote
 
-from cryptography.fernet import Fernet
-
 from app.core.config import get_settings
 
 STEP = 30
@@ -50,8 +48,10 @@ def provisioning_uri(secret: str, account: str) -> str:
     return f"otpauth://totp/{quote(issuer)}:{quote(account)}?secret={secret}&issuer={quote(issuer)}&digits={DIGITS}&period={STEP}"
 
 
-def _fernet() -> Fernet:
-    return Fernet(get_settings().document_encryption_key.encode())
+def _fernet():
+    from app.core.crypto import multi_fernet
+
+    return multi_fernet(get_settings().document_encryption_key)
 
 
 def encrypt_secret(secret: str) -> str:
@@ -60,3 +60,7 @@ def encrypt_secret(secret: str) -> str:
 
 def decrypt_secret(token: str) -> str:
     return _fernet().decrypt(token.encode()).decode()
+
+
+def rotate_secret(token: str) -> str:
+    return _fernet().rotate(token.encode()).decode()

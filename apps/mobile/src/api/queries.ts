@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
+import type { Schemas } from "@darna/api-client";
 import { api, unwrap } from "./client";
 
 export const qk = {
@@ -18,6 +19,10 @@ export const qk = {
   myListing: (id: string) => ["listings", "mine", id] as const,
   verifications: ["verifications"] as const,
   supportCases: ["support"] as const,
+  priceHistory: (id: string) => ["listing", id, "price-history"] as const,
+  market: (projectId: string, purpose: string, types: string[]) => ["public", "market", projectId, purpose, ...types] as const,
+  savedSearches: ["saved-searches"] as const,
+  savedSearchResults: (id: string) => ["saved-searches", id, "results"] as const,
 };
 
 export function useProjects() {
@@ -155,5 +160,78 @@ export function useSetNotificationPref() {
     onSettled: () => {
       if (qc.isMutating({ mutationKey }) <= 1) void qc.invalidateQueries({ queryKey: qk.notificationPrefs });
     },
+  });
+}
+
+export function usePriceHistory(id: string) {
+  return useQuery({
+    queryKey: qk.priceHistory(id),
+    queryFn: async () => unwrap(await api.GET("/listings/{listing_id}/price-history", { params: { path: { listing_id: id } } })),
+  });
+}
+
+export function useMarketSummary(projectId: string | undefined, purpose: "sale" | "rent", propertyTypes: Schemas["PropertyType"][]) {
+  return useQuery({
+    queryKey: qk.market(projectId ?? "", purpose, propertyTypes),
+    enabled: !!projectId,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(await api.GET("/market/summary", { params: { query: { project_id: projectId!, purpose, property_type: propertyTypes, months: 12 } } })),
+  });
+}
+
+/** Cash vs installments comparison; `discountRate` is a fraction (0.2 = 20%). Disabled until a rate is set. */
+export function useCashComparison(listingId: string, discountRate: number | null, cashPrice: number | null) {
+  return useQuery({
+    queryKey: ["listing", listingId, "compare", discountRate, cashPrice],
+    enabled: discountRate !== null,
+    placeholderData: (prev) => prev,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/listings/{listing_id}/financials/compare", {
+          params: { path: { listing_id: listingId }, query: { discount_rate: discountRate!, ...(cashPrice ? { cash_price: cashPrice } : {}) } },
+        }),
+      ),
+  });
+}
+
+export function useSavedSearches() {
+  const { status } = useAuth();
+  return useQuery({ queryKey: qk.savedSearches, enabled: status === "signedIn", queryFn: async () => unwrap(await api.GET("/saved-searches")) });
+}
+
+export function useCreateSavedSearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: Schemas["SavedSearchIn"]) => unwrap(await api.POST("/saved-searches", { body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.savedSearches }),
+  });
+}
+
+export function useUpdateSavedSearch() {
+  const qc = useQueryClient();
+  type List = Schemas["SavedSearchOut"][];
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string } & Schemas["SavedSearchUpdate"]) =>
+      unwrap(await api.PATCH("/saved-searches/{saved_id}", { params: { path: { saved_id: id } }, body })),
+    onMutate: async ({ id, ...body }) => {
+      await qc.cancelQueries({ queryKey: qk.savedSearches });
+      const previous = qc.getQueryData<List>(qk.savedSearches);
+      qc.setQueryData<List>(qk.savedSearches, (old) =>
+        old?.map((s) => (s.id === id ? { ...s, ...(body.name ? { name: body.name } : {}), ...(body.alerts_enabled != null ? { alerts_enabled: body.alerts_enabled } : {}) } : s)),
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => ctx?.previous && qc.setQueryData(qk.savedSearches, ctx.previous),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.savedSearches }),
+  });
+}
+
+export function useDeleteSavedSearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await api.DELETE("/saved-searches/{saved_id}", { params: { path: { saved_id: id } } })),
+    onSuccess: (_d, id) => qc.setQueryData<Schemas["SavedSearchOut"][]>(qk.savedSearches, (old) => old?.filter((s) => s.id !== id)),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.savedSearches }),
   });
 }

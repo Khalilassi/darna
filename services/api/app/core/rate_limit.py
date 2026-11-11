@@ -1,15 +1,18 @@
-"""In-process sliding-window rate limiter.
+"""Sliding-window rate limiter.
 
-Adequate for a single API instance. For multiple instances replace ``_store`` with Redis
-(see docs/architecture/security.md) — the dependency interface stays the same.
-
-Memory is bounded by the set of keys active within the longest window: every ``SWEEP_EVERY``
-calls, keys whose newest hit is older than their window are evicted.
+``DARNA_RATE_LIMIT_BACKEND``:
+- ``memory`` (default): per process. Correct for a single API instance. Memory is bounded: every
+  ``SWEEP_EVERY`` calls, keys whose newest hit is older than their window are evicted.
+- ``redis``: shared by all instances via ``DARNA_REDIS_URL``. Each check is one atomic Lua script over a
+  sorted set, so concurrent requests cannot both slip under the limit. If Redis is unreachable the request
+  is allowed and a warning logged (account lockout, which protects sign-in, is enforced in PostgreSQL).
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
+import uuid
 from collections import deque
 
 from fastapi import Request
@@ -62,12 +65,58 @@ def hit(key: str, max_calls: int, per_seconds: int, now: float | None = None) ->
         return True
 
 
+log = logging.getLogger("darna.ratelimit")
+
+# KEYS[1]=key ARGV: now_ms, window_ms, max_calls, member. Returns 1 when allowed, 0 when limited.
+_LUA = """
+redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, tonumber(ARGV[1]) - tonumber(ARGV[2]))
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[3]) then return 0 end
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
+return 1
+"""
+
+
+class RedisLimiter:
+    def __init__(self, client):
+        self.client = client
+        self.script = client.register_script(_LUA)
+
+    def hit(self, key: str, max_calls: int, per_seconds: int) -> bool:
+        now_ms = int(time.time() * 1000)
+        try:
+            return bool(self.script(keys=[f"darna:rl:{key}"], args=[now_ms, per_seconds * 1000, max_calls, uuid.uuid4().hex]))
+        except Exception:  # noqa: BLE001 - any Redis failure: fail open, logged
+            log.warning("rate limiter backend unavailable; allowing request")
+            return True
+
+
+_redis_limiter: RedisLimiter | None = None
+
+
+def _backend_hit(key: str, max_calls: int, per_seconds: int) -> bool:
+    global _redis_limiter
+    s = get_settings()
+    if s.rate_limit_backend == "redis":
+        if _redis_limiter is None:
+            import redis
+
+            _redis_limiter = RedisLimiter(redis.Redis.from_url(s.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5))
+        return _redis_limiter.hit(key, max_calls, per_seconds)
+    return hit(key, max_calls, per_seconds)
+
+
+def set_redis_limiter(limiter: RedisLimiter | None) -> None:
+    global _redis_limiter
+    _redis_limiter = limiter
+
+
 def limit(scope: str, max_calls: int, per_seconds: int):
     def dependency(request: Request) -> None:
         if not get_settings().rate_limit_enabled:
             return
         ip = request.client.host if request.client else "unknown"
-        if not hit(f"{scope}:{ip}", max_calls, per_seconds):
+        if not _backend_hit(f"{scope}:{ip}", max_calls, per_seconds):
             raise RateLimited("Too many requests, try again later", details={"retry_after_seconds": per_seconds})
 
     return dependency

@@ -222,3 +222,27 @@ def test_rent_annual_increase_and_fees():
     assert r.min_term_rent_total == D("252000.00")  # 12*10000 + 12*11000
     assert r.min_term_rent_assumes_increase
     assert r.unconfirmed == ["club_access"]
+
+
+def test_cash_vs_installments_comparison():
+    from app.finance.engine import compare_cash_vs_installments
+    insts = [Installment(due_date=date(2027, 11, 1), amount=D("110000"))]
+    inp = SaleInput(payment_mode=PaymentMode.installments, area_sqm=D("100"), owner_cash_price=amt("500000"), installments=insts)
+    c = compare_cash_vs_installments(inp, AS_OF, D("0.10"))
+    assert c.initial_cash == D("500000.00") and c.future_present_value == D("100000.00")
+    assert c.nominal_total == D("610000.00") and c.break_even_cash_price == D("600000.00")
+    assert c.cheaper_option is None and "10.00%" in c.assumption
+    assert compare_cash_vs_installments(inp, AS_OF, D("0.10"), D("620000")).cheaper_option == "installments"
+    cash = compare_cash_vs_installments(inp, AS_OF, D("0.10"), D("590000"))
+    assert cash.cheaper_option == "cash" and cash.present_value_difference == D("-10000.00")
+    assert compare_cash_vs_installments(inp, AS_OF, D("0.10"), D("600000")).cheaper_option == "equal"
+    # At a 0% rate, money has no time value: break-even equals the nominal total
+    assert compare_cash_vs_installments(inp, AS_OF, D("0")).break_even_cash_price == D("610000.00")
+
+
+def test_cash_comparison_flags_excluded_estimates():
+    from app.finance.engine import compare_cash_vs_installments
+    insts = [Installment(due_date=date(2027, 11, 1), amount=D("1000"))]
+    inp = SaleInput(payment_mode=PaymentMode.installments, area_sqm=D("100"), owner_cash_price=amt("5000"), installments=insts,
+                    fees=[Fee(code="transfer_fee", value=Amount(provenance=Provenance.unknown))])
+    assert compare_cash_vs_installments(inp, AS_OF, D("0.1")).excludes_estimates_and_unknowns is True

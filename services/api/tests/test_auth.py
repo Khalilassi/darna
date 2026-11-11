@@ -72,6 +72,6 @@ def test_rate_limit(client, monkeypatch):
 
     monkeypatch.setattr(get_settings(), "rate_limit_enabled", True)
     rate_limit.reset()
-    codes = [client.post("/auth/login", json={"email": "x@example.com", "password": "nope-nope-1"}).status_code for _ in range(22)]
+    codes = [client.post("/auth/login", json={"email": f"x{i}@example.com", "password": "nope-nope-1"}).status_code for i in range(22)]
     assert codes[:20] == [401] * 20 and codes[-1] == 429
     rate_limit.reset()

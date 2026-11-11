@@ -12,3 +12,5 @@ PyJWT==2.15.1
 python-multipart==0.0.33
 SQLAlchemy==2.1.8
 uvicorn==0.54.0
+boto3==1.44.0
+redis==8.1.0

@@ -6,22 +6,34 @@
   for staff; resource checks for members (owner-only listing ops via approved claim; deal/conversation/viewing
   party checks returning 404 to outsiders; representative scope & expiry). Reviewers cannot decide their own
   submissions; admins cannot demote/suspend themselves.
-- **Documents**: content-sniffed type allow-list (PDF/JPEG/PNG/WEBP), 10 MB cap, Fernet encryption at rest,
-  random storage keys, never publicly routable. Access through 5-minute HMAC-signed URLs bound to user+document,
+- **Documents**: content-sniffed type allow-list (PDF/JPEG/PNG/WEBP), 10 MB cap, Fernet encryption by the
+  application before storage, random storage keys, never publicly routable. With `DARNA_STORAGE_BACKEND=s3` the
+  ciphertext is also stored with SSE-KMS (or SSE-S3) in a private bucket separate from the photo bucket. Access through 5-minute HMAC-signed URLs bound to user+document,
   re-authorized at read time, `Cache-Control: no-store`, every read audited. Deletion blocked when attached to a
   deal record (retention); `retain_until` stored per document (retention job: backlog).
 - **Photos**: decoded and re-encoded by Pillow (strips EXIF/GPS), size-capped.
+- **Malware scanning**: every document and photo is streamed to ClamAV (`clamd` INSTREAM) before it is stored;
+  infected files get `422 file_rejected_malware`. If the scanner is down, uploads are refused (`503`) unless
+  fail-open is explicitly configured. Production refuses to start without a scanner.
+- **Key rotation**: `DARNA_DOCUMENT_ENCRYPTION_KEY` takes several keys (first encrypts, all decrypt).
+  `python -m app.rotate_keys` re-encrypts stored documents and staff TOTP secrets with the newest key, after
+  which old keys are removed. Procedure in `app/core/crypto.py`.
+- **Phone verification**: 6-digit SMS codes, 10-minute expiry, 5 attempts, 60 s resend cooldown, 5 per hour;
+  only an HMAC of the code is stored; a verified number belongs to one account (partial unique index).
 - **Data minimization**: public listing payloads exclude building/unit, owner contact and email; only owner first
   name. Unit is disclosed to deal parties after terms are agreed.
 - **Audit log**: append-only `audit_logs` written in the same transaction as the change; metadata passes through
   `redact()` (sensitive keys, phone numbers, emails). Server logs never include bodies; unhandled errors log only
   type + path and return a generic 500.
+- **Account lockout**: 8 failed sign-ins (password or two-factor code) within 15 minutes lock that email for 15
+  minutes. Counted per email hash, including unknown emails, so the response never reveals whether an account
+  exists. The owner gets an in-app notification.
 - **Abuse controls**: per-IP sliding-window rate limits on register/login/refresh/uploads/messages/support
-  (in-process; use Redis for multi-instance). Messages with phone/email return a safety tip.
+  (in-process by default; `DARNA_RATE_LIMIT_BACKEND=redis` shares limits across instances with an atomic
+  Lua script, failing open if Redis is unreachable). Messages with phone/email return a safety tip.
 - **Headers/config**: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `no-store` on private
   routes; explicit CORS allow-list; docs disabled in production; process refuses to start in staging/production
   with development secrets.
 
 ## Known gaps (tracked in backlog)
-MFA for staff, account lockout beyond rate limits, malware scanning of uploads, KMS-managed keys and key
-rotation, object storage with server-side encryption, retention purge job, PDPL legal review, penetration test.
+A real SMS provider, operating ClamAV/Redis in production, PDPL legal review, penetration test.

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, unwrap } from "../src/api/client";
 import { errorMessage, fieldErrors } from "../src/api/errors";
 import { useAuth } from "../src/auth/AuthProvider";
-import { Button, Card, Notice, Screen, Segmented, SignInRequired, T, TextField } from "../src/components";
+import { Badge, Button, Card, Notice, Screen, Segmented, SignInRequired, T, TextField } from "../src/components";
 import { useLanguage } from "../src/i18n/LanguageProvider";
 import type { Language } from "../src/i18n/language";
 import { validatePhone } from "../src/lib/validation";
@@ -56,6 +56,7 @@ export default function Settings() {
 
 function ProfileForm() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { me, refreshMe } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -82,6 +83,19 @@ function ProfileForm() {
       <TextField label={t("settings.email")} value={me?.email ?? ""} editable={false} />
       <TextField label={t("settings.name")} value={name} onChangeText={setName} error={errors.full_name} testID="settings-name" />
       <TextField label={t("settings.phone")} value={phone} onChangeText={setPhone} keyboardType="phone-pad" error={errors.phone} optional optionalLabel={t("common.optional")} />
+      {me?.phone ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Badge
+            label={me.phone_verified_at ? t("phone.verified") : t("phone.notVerified")}
+            tone={me.phone_verified_at ? "success" : "warning"}
+            icon={me.phone_verified_at ? "shield-checkmark" : "alert-circle"}
+            testID="phone-status"
+          />
+          {!me.phone_verified_at && phone.trim() === (me.phone ?? "") ? (
+            <Button title={t("phone.verifyCta")} size="sm" variant="outline" onPress={() => router.push("/verify-phone")} testID="phone-verify" />
+          ) : null}
+        </View>
+      ) : null}
       {save.isError && !Object.keys(fieldErrors(save.error)).length ? <Notice tone="danger">{errorMessage(save.error, t)}</Notice> : null}
       {save.isSuccess ? <Notice tone="success">{t("settings.saved")}</Notice> : null}
       <Button title={t("common.save")} onPress={submit} loading={save.isPending} testID="settings-save" />
