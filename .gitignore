@@ -16,3 +16,4 @@ coverage/
 services/api/storage/
 *.log
 .DS_Store
+services/api/storage/
