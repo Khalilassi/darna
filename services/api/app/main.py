@@ -64,9 +64,10 @@ def create_app() -> FastAPI:
     for r in (auth, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
 
-    media = settings.storage_dir / "public"
-    media.mkdir(parents=True, exist_ok=True)
-    app.mount("/media", StaticFiles(directory=media), name="media")
+    if settings.storage_backend == "local":  # with s3, photos are served by the CDN / bucket
+        media = settings.storage_dir / "public"
+        media.mkdir(parents=True, exist_ok=True)
+        app.mount("/media", StaticFiles(directory=media), name="media")
 
     @app.get("/health", tags=["meta"])
     def health():

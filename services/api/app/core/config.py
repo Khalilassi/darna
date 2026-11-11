@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     document_retention_days: int = 365 * 7
 
     storage_dir: Path = Path(__file__).resolve().parents[2] / "storage"
+    storage_backend: str = "local"  # local | s3
+    s3_private_bucket: str = ""
+    s3_public_bucket: str = ""
+    s3_region: str = "eu-central-1"
+    s3_endpoint_url: str | None = None  # S3-compatible stores (MinIO, R2, ...)
+    s3_kms_key_id: str | None = None
+    media_base_url: str = ""  # CDN / public bucket URL for listing photos when storage_backend=s3
     public_base_url: str = "http://localhost:8000"
     max_upload_bytes: int = 10 * 1024 * 1024
 
@@ -55,6 +62,12 @@ class Settings(BaseSettings):
                 raise RuntimeError("DARNA_JWT_SECRET must be set to a strong secret outside development")
             if self.document_encryption_key == DEV_FERNET_KEY:
                 raise RuntimeError("DARNA_DOCUMENT_ENCRYPTION_KEY must be set outside development")
+        if self.storage_backend not in {"local", "s3"}:
+            raise RuntimeError("DARNA_STORAGE_BACKEND must be 'local' or 's3'")
+        if self.storage_backend == "s3" and not (self.s3_private_bucket and self.s3_public_bucket and self.media_base_url):
+            raise RuntimeError("s3 storage needs DARNA_S3_PRIVATE_BUCKET, DARNA_S3_PUBLIC_BUCKET and DARNA_MEDIA_BASE_URL")
+        if self.s3_private_bucket and self.s3_private_bucket == self.s3_public_bucket:
+            raise RuntimeError("Private documents and public photos must use different buckets")
 
 
 @lru_cache
