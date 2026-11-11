@@ -5,6 +5,8 @@ export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === "mfa_enrollment_required")
       return "Set up two-factor authentication under Account security to use staff tools (mfa_enrollment_required).";
+    if (err.code === "mfa_session_required")
+      return "Sign out and sign in again with your authenticator code to use staff tools (mfa_session_required).";
     if (err.code === "mfa_invalid") return "That code is not valid or was already used. Wait for a new code and try again (mfa_invalid).";
     if (err.status === 403) return `You don't have permission for this action (${err.code}).`;
     if (err.status === 422 && err.code === "http_error") return "The request was rejected as invalid (validation_error).";

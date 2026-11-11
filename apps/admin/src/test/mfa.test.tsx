@@ -133,3 +133,10 @@ describe("account security page", () => {
     expect(screen.queryByRole("link", { name: "Account security" })).not.toBeInTheDocument();
   });
 });
+
+describe("errorMessage for staff sessions", () => {
+  it("tells staff to sign in again with a code when the session lacks MFA", async () => {
+    const { errorMessage } = await import("@/lib/errors");
+    expect(errorMessage(new ApiError(403, "mfa_session_required", "x"))).toMatch(/sign in again with your authenticator code/i);
+  });
+});

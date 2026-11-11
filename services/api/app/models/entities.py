@@ -109,7 +109,7 @@ class PhoneVerification(IdMixin, Base):
 
     __tablename__ = "phone_verifications"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    phone: Mapped[str] = mapped_column(String(32))
+    phone: Mapped[str] = mapped_column(String(32), index=True)
     code_hash: Mapped[str] = mapped_column(String(64))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -259,6 +259,9 @@ class VerificationRequest(IdMixin, TimestampMixin, Base):
     decision_note: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     document_ids: Mapped[list[str]] = mapped_column(Json, default=list)
+    # Financial requests: hash of the sale terms the reviewer is asked to check (approval is refused
+    # if the owner edited them afterwards).
+    terms_hash: Mapped[str | None] = mapped_column(String(64))
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
 

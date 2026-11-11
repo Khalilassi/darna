@@ -13,7 +13,11 @@ Legend: P1 next, P2 soon, P3 later.
 ## Security
 - ✅ Staff MFA (backend + admin screens); account lockout.
 - ✅ Malware scanning (ClamAV), S3 storage with SSE/KMS, key rotation.
-- ✅ Dependency scanning in CI (pip-audit, npm audit) + Dependabot. P2 Penetration test.
+- ✅ Dependency scanning in CI (pip-audit, npm audit) + Dependabot. P2 External penetration test.
+- ✅ Internal security review (2026-11-11): 10 findings fixed, see `docs/architecture/security.md`.
+- P1 Admin-issued one-time codes for staff MFA enrolment (closes the remaining enrolment-bootstrap gap).
+- P2 Let the approved owner (or a reviewer) correct property attributes registered by someone else.
+- P2 Set `FORWARDED_ALLOW_IPS` to the load balancer range at deployment (rate limits key on client IP).
 
 ## Product
 - ✅ Push (backend, mobile registration, deep links, settings). P1 verify on a device with an EAS project.

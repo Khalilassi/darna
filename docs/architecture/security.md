@@ -35,5 +35,38 @@
   routes; explicit CORS allow-list; docs disabled in production; process refuses to start in staging/production
   with development secrets.
 
+## Internal security review (2026-11-11)
+
+A code-level review of the API (not a substitute for an external penetration test). Every finding below was
+reproduced with a test before it was fixed; regression tests are in `services/api/tests/test_security_review.py`
+(plus `test_properties.py` for the unit-number oracle).
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | A reviewer/admin without MFA could read any private document: document access checked the role directly and skipped the staff-MFA policy. | All role checks go through `has_permission()`; signed document URLs carry whether the issuing session used MFA. |
+| High | `/properties/identity-check` + public group/floor/type revealed private building and unit numbers (300 guesses found a listing's unit). | Endpoint removed. Registering an existing unit becomes an ownership claim (needs an ownership document, goes to review, opens a dispute with an approved owner). Claims are rate-limited per user (10/day) and per user+property (3/30 days). |
+| Medium | Financial verification could certify figures edited after submission. | Requests store a hash of the sale terms; approval is refused (`terms_changed_since_submission`) if they changed. |
+| Medium | Deal documents stayed readable by the counterparty after the deal was cancelled, and could not be deleted. | Access and retention apply only to deals that are not cancelled. |
+| Medium | Staff MFA was checked per account, not per session; enrolment needed only an access token and kept older sessions. | Access tokens carry an `mfa` claim (kept across refresh); staff tools require it. MFA setup re-checks the password; confirming revokes every earlier session and returns a fresh MFA session. |
+| Medium | Users could delete documents a pending or approved verification relies on. | Refused with `document_in_verification`. |
+| Low | Suspending an owner left listings under offer public; staff could approve a suspended owner's pending listing. | Under-offer listings are suspended too; approval checks `is_active`. |
+| Low | Claim/withdraw loops could spam an owner with dispute notifications. | Claim rate limits above. |
+| Low | No limit on SMS codes sent to one number across accounts. | 5/hour and 10/day per destination number, serialized per number. |
+| Low | Photos were decoded without a pixel limit (decompression bomb). | Images above 40 MP are refused before decoding. |
+
+**Not fixed — decisions or follow-ups:**
+- **Staff MFA enrolment bootstrap (P1).** Someone who already has the password of a staff account that has
+  not enrolled yet can still enrol their own authenticator. Closing this needs admin-issued, one-time
+  enrolment codes. Until then, enrol staff MFA when the role is granted.
+- **Rate limits behind a load balancer.** Limits are keyed on the client address that uvicorn sees. In
+  production, set `FORWARDED_ALLOW_IPS` to the load balancer's address range; never `*`, which lets clients
+  spoof `X-Forwarded-For`.
+- **Property details registered first cannot be corrected** (area, floor, bedrooms). Reviewers should
+  confirm attributes when approving the first claim; an edit flow for the approved owner is a backlog item.
+- **Accepted trade-offs:** registration reveals whether an email is taken (`email_taken`), and 8 bad
+  passwords lock an account for 15 minutes. Re-registering an Expo push token moves it to the new account;
+  push content is generic. Listing view counts can be inflated, which affects only owner statistics.
+
 ## Known gaps (tracked in backlog)
-A real SMS provider, operating ClamAV/Redis in production, PDPL legal review, penetration test.
+A real SMS provider, operating ClamAV/Redis in production, PDPL legal review, external penetration test,
+admin-issued staff MFA enrolment codes.

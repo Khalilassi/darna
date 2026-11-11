@@ -45,7 +45,7 @@ from app.models.enums import (
 from app.modules import listings as L
 from app.modules import properties as P
 from app.modules.deals import expire_all_offers
-from app.modules.verification import VERIFICATION_FSM
+from app.modules.verification import VERIFICATION_FSM, sale_terms_hash
 from app.schemas.common import ORM, Ok, Page
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -98,7 +98,10 @@ def update_user(user_id: uuid.UUID, body: UserUpdate, request: Request, admin: U
         u.is_active = body.is_active
         u.suspended_reason = body.suspended_reason if not body.is_active else None
         if not body.is_active:
-            for listing in db.scalars(select(Listing).where(Listing.owner_id == u.id, Listing.status.in_([ListingStatus.active, ListingStatus.paused]))):
+            # Everything public (including homes under offer) leaves the marketplace; pending listings are
+            # held because approval requires an active owner.
+            suspendable = [ListingStatus.active, ListingStatus.paused, ListingStatus.under_offer]
+            for listing in db.scalars(select(Listing).where(Listing.owner_id == u.id, Listing.status.in_(suspendable))):
                 L.transition(db, listing, ListingStatus.suspended, admin, client_ip(request), note="Owner account suspended")
     audit(db, "user.updated", "user", u.id, actor_id=admin.id, data=body.model_dump(exclude_none=True, mode="json"), ip=client_ip(request))
     db.commit()
@@ -210,6 +213,12 @@ def decide(vr_id: uuid.UUID, body: DecisionIn, request: Request, reviewer: User 
     else:
         target = VS.approved if body.decision == "approve" else VS.rejected
         VERIFICATION_FSM.assert_transition(vr.status, target)
+        if vr.kind == VerificationKind.financial and target == VS.approved and vr.listing_id:
+            listing = db.get(Listing, vr.listing_id, with_for_update=True)
+            # Requests created before terms_hash existed (NULL) keep the previous behaviour.
+            if listing is None or (vr.terms_hash is not None and sale_terms_hash(listing.sale_terms) != vr.terms_hash):
+                raise Conflict("The owner changed the figures after submitting them; ask them to submit again",
+                               code="terms_changed_since_submission")
         vr.status = target
         vr.reviewer_id = reviewer.id
         vr.decision_note = body.note
@@ -299,7 +308,9 @@ def moderate(listing_id: uuid.UUID, body: ModerateIn, request: Request, staff: U
     if body.action == "approve":
         owner = db.get(User, listing.owner_id)
         claim = db.get(OwnershipClaim, listing.claim_id)
-        if owner is None or owner.identity_verified_at is None or claim is None or claim.status != ClaimStatus.approved:
+        if owner is None or not owner.is_active:
+            raise Conflict("The owner's account is suspended", code="owner_suspended")
+        if owner.identity_verified_at is None or claim is None or claim.status != ClaimStatus.approved:
             raise Conflict("Owner identity and ownership must be verified first", code="owner_not_verified")
         L.transition(db, listing, ListingStatus.active, staff, ip, note=body.note)
         listing.approved_version = listing.version

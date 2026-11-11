@@ -6,7 +6,8 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import Response
-from sqlalchemy import exists, select
+from sqlalchemy import cast, exists, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit
@@ -18,8 +19,9 @@ from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.scanning import ensure_clean
 from app.core.security import sha256_hex, sign_document_access, verify_document_access
 from app.core.storage import ALLOWED_DOC_TYPES, private_storage, sniff_type
-from app.models.entities import ChecklistItem, Deal, Document, User
-from app.models.enums import DocumentKind
+from app.models.entities import ChecklistItem, Deal, Document, User, VerificationRequest
+from app.models.enums import DealStatus, DocumentKind
+from app.models.enums import VerificationStatus as VS
 from app.schemas.common import ORM, Ok
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -46,13 +48,15 @@ def can_access_document(db: Session, user: User, doc: Document) -> bool:
         return True
     if has_permission(user, "document.review"):
         return True
-    # Counterparty in a deal where this document was attached to the checklist.
+    # Counterparty in a live or completed deal where this document was attached to the checklist.
+    # A cancelled deal ends the counterparty's access.
     return bool(
         db.scalar(
             select(
                 exists().where(
                     ChecklistItem.document_id == doc.id,
                     ChecklistItem.deal_id == Deal.id,
+                    Deal.status != DealStatus.cancelled,
                     (Deal.buyer_id == user.id) | (Deal.owner_id == user.id),
                 )
             )
@@ -145,9 +149,17 @@ def delete_document(document_id: uuid.UUID, request: Request, user: User = Depen
     doc = db.get(Document, document_id)
     if doc is None or doc.owner_id != user.id or doc.deleted_at:
         raise NotFound("Document not found")
-    in_use = db.scalar(select(exists().where(ChecklistItem.document_id == doc.id)))
+    in_use = db.scalar(select(exists().where(
+        ChecklistItem.document_id == doc.id, ChecklistItem.deal_id == Deal.id, Deal.status != DealStatus.cancelled)))
     if in_use:
         raise Forbidden("Document is attached to a transaction record and is retained", code="document_retained")
+    # Evidence for a pending or approved verification (identity, ownership, financials) is kept.
+    evidence = db.scalar(select(exists().where(
+        VerificationRequest.status.in_([VS.submitted, VS.under_review, VS.more_info_required, VS.approved]),
+        cast(VerificationRequest.document_ids, JSONB).contains([str(doc.id)]),
+    )))
+    if evidence:
+        raise Forbidden("Document is evidence for a verification and is retained", code="document_in_verification")
     doc.deleted_at = utcnow()
     private_storage().delete(doc.storage_key)
     audit(db, "document.deleted", "document", doc.id, actor_id=user.id, ip=client_ip(request))
