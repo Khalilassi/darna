@@ -201,3 +201,48 @@ def test_cli_issues_code_for_staff_only(make_user, capsys):
     assert len(capsys.readouterr().out.split()[0]) == 14  # XXXX-XXXX-XXXX
     assert main([member.email]) == 1
     assert main([]) == 2
+
+
+def test_delete_waits_for_a_concurrent_submission_referencing_the_document(make_user):
+    """A verification that validated the document first must not end up pointing at a deleted file."""
+    import threading
+    import uuid as _uuid
+
+    from fastapi.testclient import TestClient
+
+    from app.core.db import session_factory
+    from app.main import app
+    from app.models.entities import User, VerificationRequest
+    from app.models.enums import VerificationKind
+    from app.modules.documents import get_owned_documents
+    u = make_user()
+    did = u.upload_doc("national_id")
+    s1 = session_factory()()
+    try:
+        owner = s1.get(User, u.id)
+        docs = get_owned_documents(s1, owner, [_uuid.UUID(did)])  # validated + locked, not yet committed
+        s1.add(VerificationRequest(user_id=owner.id, kind=VerificationKind.identity, document_ids=[str(d.id) for d in docs]))
+        s1.flush()
+        result = {}
+        t = threading.Thread(target=lambda: result.setdefault("r", TestClient(app).delete(f"/documents/{did}", headers=u.h)))
+        t.start()
+        t.join(timeout=1.0)
+        assert t.is_alive(), "delete must wait for the submission holding the document lock"
+        s1.commit()
+        t.join(timeout=10)
+        assert result["r"].status_code == 403 and result["r"].json()["error"]["code"] == "document_in_verification"
+    finally:
+        s1.close()
+
+
+def test_withdrawing_a_claim_withdraws_its_verification_and_frees_the_evidence(make_user, project, reviewer):
+    from tests.conftest import property_payload
+    owner = make_user()
+    doc = owner.upload_doc("ownership_contract")
+    r = owner.post("/properties", json={"property": property_payload(project), "claim": {"document_ids": [doc]}})
+    claim_id = r.json()["claim"]["id"]
+    assert owner.delete(f"/documents/{doc}").status_code == 403
+    assert owner.post(f"/properties/claims/{claim_id}/withdraw").status_code == 200
+    queue = reviewer.get("/admin/verifications", params={"kind": "ownership"}).json()["items"]
+    assert all(i["claim_id"] != claim_id for i in queue)
+    assert owner.delete(f"/documents/{doc}").status_code == 200

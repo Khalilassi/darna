@@ -33,7 +33,7 @@ VERIFICATION_FSM = StateMachine(
     "verification",
     {
         VS.submitted: [VS.under_review, VS.approved, VS.rejected, VS.more_info_required, VS.withdrawn],
-        VS.under_review: [VS.approved, VS.rejected, VS.more_info_required],
+        VS.under_review: [VS.approved, VS.rejected, VS.more_info_required, VS.withdrawn],
         VS.more_info_required: [VS.submitted, VS.withdrawn, VS.rejected],
     },
     terminal=[VS.approved, VS.rejected, VS.withdrawn],

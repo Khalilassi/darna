@@ -65,7 +65,10 @@ def can_access_document(db: Session, user: User, doc: Document) -> bool:
 
 
 def get_owned_documents(db: Session, user: User, ids: list[uuid.UUID]) -> list[Document]:
-    docs = db.scalars(select(Document).where(Document.id.in_(ids), Document.deleted_at.is_(None))).all() if ids else []
+    """Validate and lock (until commit) documents a request is about to reference, so a concurrent delete
+    cannot remove them in between. Rows are locked in id order, like delete_document, to avoid deadlocks."""
+    docs = db.scalars(select(Document).where(Document.id.in_(ids)).order_by(Document.id).with_for_update()).all() if ids else []
+    docs = [d for d in docs if d.deleted_at is None]
     if len(docs) != len(set(ids)) or any(d.owner_id != user.id for d in docs):
         raise ValidationFailed("Unknown document reference", code="invalid_document_reference")
     return list(docs)
@@ -146,7 +149,9 @@ def content(document_id: uuid.UUID, request: Request, token: str = Query(max_len
 
 @router.delete("/{document_id}", response_model=Ok)
 def delete_document(document_id: uuid.UUID, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    doc = db.get(Document, document_id)
+    # Row lock: a concurrent request referencing this document (verification, claim, checklist) either
+    # commits first, and the checks below see it, or waits and then finds the document deleted.
+    doc = db.get(Document, document_id, with_for_update=True)
     if doc is None or doc.owner_id != user.id or doc.deleted_at:
         raise NotFound("Document not found")
     in_use = db.scalar(select(exists().where(
@@ -161,7 +166,8 @@ def delete_document(document_id: uuid.UUID, request: Request, user: User = Depen
     if evidence:
         raise Forbidden("Document is evidence for a verification and is retained", code="document_in_verification")
     doc.deleted_at = utcnow()
-    private_storage().delete(doc.storage_key)
     audit(db, "document.deleted", "document", doc.id, actor_id=user.id, ip=client_ip(request))
     db.commit()
+    # Remove the bytes only once the deletion is committed (the worker purge also skips deleted rows).
+    private_storage().delete(doc.storage_key)
     return Ok()

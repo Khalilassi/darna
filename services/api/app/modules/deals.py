@@ -611,7 +611,7 @@ def update_checklist(deal_id: uuid.UUID, item_id: uuid.UUID, body: ChecklistUpda
         raise err
     if body.action == "submit":
         if body.document_id:
-            doc = db.get(Document, body.document_id)
+            doc = db.get(Document, body.document_id, with_for_update=True)  # vs. concurrent delete
             if doc is None or doc.owner_id != user.id or doc.deleted_at:
                 raise ValidationFailed("Unknown document", code="invalid_document_reference")
             item.document_id = doc.id

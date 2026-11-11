@@ -281,6 +281,7 @@ def register_property(body: RegisterPropertyIn, request: Request, user: User = D
         prop = db.scalar(select(Property).where(Property.project_id == p.project_id, Property.identity_key == key))
         if prop is None:  # pragma: no cover - the conflicting row was deleted concurrently
             raise
+        doc_ids = _validate_claim_docs(db, user, body.claim)  # the rollback released the document locks
         rate_limit.enforce(f"claim:user:{user.id}:property:{prop.id}", CLAIMS_PER_USER_PROPERTY_PER_MONTH, 30 * 86400)
         claimed_existing = True
     claim = _create_claim(db, user, prop, body.claim, doc_ids, client_ip(request))
@@ -310,6 +311,10 @@ def withdraw_claim(claim_id: uuid.UUID, request: Request, user: User = Depends(c
         raise NotFound("Claim not found")
     CLAIM_FSM.assert_transition(claim.status, CS.withdrawn)
     claim.status = CS.withdrawn
+    # The claim's verification request ends with it: reviewers no longer see it, and its evidence can be deleted.
+    for vr in db.scalars(select(VerificationRequest).where(
+            VerificationRequest.claim_id == claim.id, VerificationRequest.decided_at.is_(None)).with_for_update()):
+        vr.status = VerificationStatus.withdrawn
     for d in db.scalars(select(PropertyDispute).where(PropertyDispute.challenger_claim_id == claim.id, PropertyDispute.status == DisputeStatus.open)):
         d.status = DisputeStatus.dismissed
         d.resolution_note = "Challenger withdrew the claim"
