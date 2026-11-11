@@ -17,6 +17,7 @@ export default function SecurityPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [enrollmentCode, setEnrollmentCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const enabled = !!me?.mfa_enabled_at;
@@ -36,8 +37,9 @@ export default function SecurityPage() {
   const start = (e: FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      setSetup(await api.mfaSetup(password));
+      setSetup(await api.mfaSetup(password, enrollmentCode.trim()));
       setPassword("");
+      setEnrollmentCode("");
     });
   };
 
@@ -107,6 +109,23 @@ export default function SecurityPage() {
                 <label htmlFor="setup-password">Confirm your password</label>
                 <input id="setup-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
+              {me?.role !== "member" && (
+                <div className="field">
+                  <label htmlFor="setup-enrollment-code">Setup code from an administrator</label>
+                  <input
+                    id="setup-enrollment-code"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={32}
+                    aria-describedby="setup-enrollment-help"
+                    value={enrollmentCode}
+                    onChange={(e) => setEnrollmentCode(e.target.value.toUpperCase())}
+                  />
+                  <p id="setup-enrollment-help" className="muted small">
+                    Staff accounts need a one-time code (format XXXX-XXXX-XXXX). Ask an administrator to issue one under Users.
+                  </p>
+                </div>
+              )}
               <div>
                 <button type="submit" className="btn btn-primary" disabled={busy || !password}>
                   {busy ? "Preparing…" : "Set up two-factor authentication"}

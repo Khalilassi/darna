@@ -107,7 +107,7 @@ def test_totp_rfc6238_vectors():
     assert totp.verify(secret, "12345", None) is None
 
 
-def test_staff_mfa_enrollment_login_and_enforcement(make_user, client, monkeypatch):
+def test_staff_mfa_enrollment_login_and_enforcement(make_user, client, monkeypatch, db):
     from app.core.config import get_settings
     from app.models.enums import Role
     staff = make_user(Role.reviewer, "Mfa Reviewer")
@@ -116,7 +116,11 @@ def test_staff_mfa_enrollment_login_and_enforcement(make_user, client, monkeypat
     assert r.status_code == 403 and r.json()["error"]["code"] == "mfa_enrollment_required"
     r = staff.post("/auth/mfa/setup", json={"password": "wrong-password-1"})
     assert r.status_code == 401  # a stolen access token alone cannot enrol an authenticator
-    setup = staff.post("/auth/mfa/setup", json={"password": PASSWORD}).json()
+    from app.core import mfa_enrollment
+    from app.models.entities import User
+    enrol_code, _ = mfa_enrollment.issue(db.get(User, staff.id))
+    db.commit()
+    setup = staff.post("/auth/mfa/setup", json={"password": PASSWORD, "enrollment_code": enrol_code}).json()
     assert setup["otpauth_uri"].startswith("otpauth://totp/")
     assert staff.post("/auth/mfa/confirm", json={"code": "000000"}).status_code in (422,)
     now = time.time()

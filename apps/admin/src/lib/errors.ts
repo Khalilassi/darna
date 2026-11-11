@@ -5,6 +5,8 @@ export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === "mfa_enrollment_required")
       return "Set up two-factor authentication under Account security to use staff tools (mfa_enrollment_required).";
+    if (err.code === "mfa_enrollment_code_required")
+      return "Enter a valid setup code from an administrator. Codes are valid for 24 hours (mfa_enrollment_code_required).";
     if (err.code === "mfa_session_required")
       return "Sign out and sign in again with your authenticator code to use staff tools (mfa_session_required).";
     if (err.code === "mfa_invalid") return "That code is not valid or was already used. Wait for a new code and try again (mfa_invalid).";

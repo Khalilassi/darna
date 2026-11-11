@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RequirePermission } from "@/components/Shell";
-import { Badge, ConfirmDialog, DataState, fmtDate, PageHeader, Pager } from "@/components/ui";
+import { Badge, ConfirmDialog, DataState, fmtDate, Modal, PageHeader, Pager } from "@/components/ui";
 import type { AdminUser } from "@/lib/adminApi";
 import { useApi, useAuth } from "@/lib/auth";
 import type { Role } from "@/lib/permissions";
@@ -15,7 +15,8 @@ const PAGE_SIZE = 25;
 type Pending =
   | { kind: "role"; user: AdminUser; role: Role }
   | { kind: "suspend"; user: AdminUser }
-  | { kind: "reactivate"; user: AdminUser };
+  | { kind: "reactivate"; user: AdminUser }
+  | { kind: "mfaCode"; user: AdminUser };
 
 function Users() {
   const api = useApi();
@@ -26,6 +27,7 @@ function Users() {
   const [page, setPage] = useState(1);
   const [pending, setPending] = useState<Pending | null>(null);
   const [reason, setReason] = useState("");
+  const [issued, setIssued] = useState<{ user: AdminUser; code: string; expires_at: string } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -40,6 +42,12 @@ function Users() {
   async function apply() {
     if (!pending) return;
     try {
+      if (pending.kind === "mfaCode") {
+        const { code, expires_at } = await api.issueMfaEnrollmentCode(pending.user.id);
+        setIssued({ user: pending.user, code, expires_at });
+        setPending(null);
+        return;
+      }
       if (pending.kind === "role") await api.updateUser(pending.user.id, { role: pending.role });
       else if (pending.kind === "suspend") await api.updateUser(pending.user.id, { is_active: false, suspended_reason: reason.trim() });
       else await api.updateUser(pending.user.id, { is_active: true });
@@ -116,6 +124,12 @@ function Users() {
                       </td>
                       <td className="nowrap">{fmtDate(u.created_at)}</td>
                       <td>
+                        <div className="row gap-xs">
+                        {u.role !== "member" && !u.mfa_enabled_at && u.is_active && (
+                          <button type="button" className="btn btn-sm" onClick={() => setPending({ kind: "mfaCode", user: u })}>
+                            2FA setup code<span className="sr-only"> for {u.full_name}</span>
+                          </button>
+                        )}
                         {u.is_active ? (
                           <button
                             type="button"
@@ -133,6 +147,7 @@ function Users() {
                             Reactivate<span className="sr-only"> {u.full_name}</span>
                           </button>
                         )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -177,6 +192,41 @@ function Users() {
             <textarea id="suspend-reason" rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
         </ConfirmDialog>
+      )}
+      {pending?.kind === "mfaCode" && (
+        <ConfirmDialog
+          title="Issue two-factor setup code"
+          confirmLabel="Issue code"
+          message={
+            <>
+              Create a one-time code that lets <strong>{pending.user.full_name}</strong> set up two-factor authentication. It is
+              valid for 24 hours and replaces any earlier code. Give it to them in person or by phone, not by email.
+            </>
+          }
+          onCancel={() => setPending(null)}
+          onConfirm={apply}
+        />
+      )}
+      {issued && (
+        <Modal
+          title="Two-factor setup code"
+          onClose={() => setIssued(null)}
+          footer={
+            <button type="button" className="btn btn-primary" onClick={() => setIssued(null)}>
+              Done
+            </button>
+          }
+        >
+          <p>
+            Code for <strong>{issued.user.full_name}</strong>, valid until {fmtDate(issued.expires_at)}. It is shown only now.
+          </p>
+          <p>
+            <code className="mono secret" aria-label="Setup code">
+              {issued.code}
+            </code>
+          </p>
+          <p className="muted small">They enter it under Account security, together with their password.</p>
+        </Modal>
       )}
       {pending?.kind === "reactivate" && (
         <ConfirmDialog

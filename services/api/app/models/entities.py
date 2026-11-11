@@ -102,6 +102,9 @@ class User(IdMixin, TimestampMixin, Base):
     totp_secret_encrypted: Mapped[str | None] = mapped_column(String(300))
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     totp_last_counter: Mapped[int | None] = mapped_column(Integer)
+    # One-time staff MFA enrolment code issued by an admin (only its hash is stored).
+    mfa_enrollment_code_hash: Mapped[str | None] = mapped_column(String(64))
+    mfa_enrollment_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PhoneVerification(IdMixin, Base):

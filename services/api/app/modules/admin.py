@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core import mfa_enrollment
 from app.core.audit import audit
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, require
@@ -62,6 +63,12 @@ class AdminUserOut(ORM):
     identity_verified_at: datetime | None
     suspended_reason: str | None
     created_at: datetime
+    mfa_enabled_at: datetime | None = None
+
+
+class EnrollmentCodeOut(BaseModel):
+    code: str
+    expires_at: datetime
 
 
 class UserUpdate(BaseModel):
@@ -106,6 +113,23 @@ def update_user(user_id: uuid.UUID, body: UserUpdate, request: Request, admin: U
     audit(db, "user.updated", "user", u.id, actor_id=admin.id, data=body.model_dump(exclude_none=True, mode="json"), ip=client_ip(request))
     db.commit()
     return u
+
+
+@router.post("/users/{user_id}/mfa-enrollment-code", response_model=EnrollmentCodeOut)
+def issue_mfa_enrollment_code(user_id: uuid.UUID, request: Request, admin: User = Depends(require("user.manage")),
+                              db: Session = Depends(get_db)):
+    """One-time code a staff member needs to enrol MFA (shown once; give it to them out of band)."""
+    u = db.get(User, user_id, with_for_update=True)
+    if u is None:
+        raise NotFound("User not found")
+    if u.role == Role.member:
+        raise Conflict("Enrolment codes are for staff accounts", code="not_staff")
+    if u.mfa_enabled_at is not None:
+        raise Conflict("Two-factor authentication is already enabled", code="mfa_already_enabled")
+    code, expires = mfa_enrollment.issue(u)
+    audit(db, "user.mfa_enrollment_code_issued", "user", u.id, actor_id=admin.id, ip=client_ip(request))
+    db.commit()
+    return EnrollmentCodeOut(code=code, expires_at=expires)
 
 
 # --------------------------------------------------------------------------- verification queue

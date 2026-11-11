@@ -53,11 +53,9 @@ reproduced with a test before it was fixed; regression tests are in `services/ap
 | Low | Claim/withdraw loops could spam an owner with dispute notifications. | Claim rate limits above. |
 | Low | No limit on SMS codes sent to one number across accounts. | 5/hour and 10/day per destination number, serialized per number. |
 | Low | Photos were decoded without a pixel limit (decompression bomb). | Images above 40 MP are refused before decoding. |
+| Medium | With the staff-MFA policy on, anyone holding an un-enrolled staff account's password could enrol their own authenticator. | Staff MFA setup needs a one-time code (24 h, hash stored, cleared on confirm) issued by an admin in an MFA session (Users → "2FA setup code"), or by an operator with `python -m app.staff_mfa_code <email>` to bootstrap the first admin. |
 
 **Not fixed — decisions or follow-ups:**
-- **Staff MFA enrolment bootstrap (P1).** Someone who already has the password of a staff account that has
-  not enrolled yet can still enrol their own authenticator. Closing this needs admin-issued, one-time
-  enrolment codes. Until then, enrol staff MFA when the role is granted.
 - **Rate limits behind a load balancer.** Limits are keyed on the client address that uvicorn sees. In
   production, set `FORWARDED_ALLOW_IPS` to the load balancer's address range; never `*`, which lets clients
   spoof `X-Forwarded-For`.
@@ -68,5 +66,4 @@ reproduced with a test before it was fixed; regression tests are in `services/ap
   push content is generic. Listing view counts can be inflated, which affects only owner statistics.
 
 ## Known gaps (tracked in backlog)
-A real SMS provider, operating ClamAV/Redis in production, PDPL legal review, external penetration test,
-admin-issued staff MFA enrolment codes.
+A real SMS provider, operating ClamAV/Redis in production, PDPL legal review, external penetration test.

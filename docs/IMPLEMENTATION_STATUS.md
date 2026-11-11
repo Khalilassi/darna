@@ -87,7 +87,7 @@ Screenshots: `apps/mobile/docs/screenshots/`, `apps/admin/docs/screenshots/`, `a
 - Production secrets: `DARNA_JWT_SECRET`, `DARNA_DOCUMENT_ENCRYPTION_KEY` (app refuses to start in staging/production without them), `DARNA_DATABASE_URL`, `DARNA_PUBLIC_BASE_URL`, `DARNA_CORS_ORIGINS`.
 - Expo/EAS account; Apple Developer Program (bundle id `com.darna.app` placeholder, certificates/profiles); Google Play Console + upload keystore.
 - Push: set `DARNA_PUSH_PROVIDER=expo` (optional `DARNA_EXPO_ACCESS_TOKEN`); real device delivery also needs FCM/APNs credentials in the Expo project. SMS provider — not integrated.
-- Staff MFA: set `DARNA_REQUIRE_STAFF_MFA=true` in production (staff without MFA are then sent to Account security before any staff API works).
+- Staff MFA: set `DARNA_REQUIRE_STAFF_MFA=true` in production. Staff then need an MFA sign-in for every staff API, and enrolling needs a one-time code: bootstrap the first admin with `python -m app.staff_mfa_code <email>` on the server, then issue codes from Users → "2FA setup code". Existing staff sessions must sign in again with their code after the switch.
 - Mobile push: `EXPO_PUBLIC_EAS_PROJECT_ID` (EAS project) — without it the app skips registration and says so in settings.
 - Object storage + KMS; hosting for API/Postgres; domain & TLS.
 - Legal review: terms, privacy policy (Egypt PDPL Law 151/2020), representative-authority rules, disclaimers; trademark check on the working name "Darna".

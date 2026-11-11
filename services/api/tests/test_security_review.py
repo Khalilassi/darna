@@ -9,16 +9,23 @@ from tests.conftest import PASSWORD
 from tests.test_hardening import sms_box  # noqa: F401  (fixture)
 
 
-def _enrol(actor, client):
-    """Enrol TOTP for an actor; returns (secret, fresh MFA token pair) and switches the actor to it."""
-    setup = actor.post("/auth/mfa/setup", json={"password": PASSWORD}).json()
+def _enrol(actor, client, db=None):
+    """Enrol TOTP for an actor; returns (secret, fresh MFA token pair) and switches the actor to it.
+    Pass ``db`` for staff accounts: an enrolment code is issued as an admin would."""
+    body = {"password": PASSWORD}
+    if db is not None:
+        from app.core import mfa_enrollment
+        from app.models.entities import User
+        body["enrollment_code"], _ = mfa_enrollment.issue(db.get(User, actor.id))
+        db.commit()
+    setup = actor.post("/auth/mfa/setup", json=body).json()
     code = totp.code_at(setup["secret"], int(time.time() // 30))
     tokens = actor.post("/auth/mfa/confirm", json={"code": code}).json()
     actor.token = tokens["access_token"]
     return setup["secret"], tokens
 
 
-def test_reviewer_without_mfa_session_cannot_read_private_documents(make_user, client, monkeypatch):
+def test_reviewer_without_mfa_session_cannot_read_private_documents(make_user, client, monkeypatch, db):
     from app.core.config import get_settings
     victim = make_user()
     doc = victim.upload_doc("national_id")
@@ -26,7 +33,7 @@ def test_reviewer_without_mfa_session_cannot_read_private_documents(make_user, c
     monkeypatch.setattr(get_settings(), "require_staff_mfa", True)
     # Password-only staff session: no staff document access (previously bypassed require()).
     assert staff.post(f"/documents/{doc}/signed-url").status_code == 404
-    _enrol(staff, client)
+    _enrol(staff, client, db)
     url = staff.post(f"/documents/{doc}/signed-url").json()["url"]
     assert client.get(url.replace("http://localhost:8000", "")).status_code == 200
     # A URL signed for a password-only session is refused at read time even if the bit is forged.
@@ -143,3 +150,54 @@ def test_decompression_bomb_photo_rejected():
     with pytest.raises(ValidationFailed) as ei:
         process_image(buf.getvalue())
     assert ei.value.code == "image_too_large"
+
+
+def test_staff_mfa_enrolment_needs_an_admin_issued_code(make_user, admin, client, monkeypatch):
+    """Knowing an un-enrolled staff account's password is not enough to bind an authenticator."""
+    from app.core.config import get_settings
+    staff = make_user(Role.reviewer, "New Reviewer")
+    member = make_user()
+    # The admin enrols first (the fixture admin has no MFA yet: policy off while bootstrapping).
+    code_r = admin.post(f"/admin/users/{staff.id}/mfa-enrollment-code")
+    assert code_r.status_code == 200
+    code = code_r.json()["code"]
+    assert admin.post(f"/admin/users/{member.id}/mfa-enrollment-code").json()["error"]["code"] == "not_staff"
+    monkeypatch.setattr(get_settings(), "require_staff_mfa", True)
+    r = staff.post("/auth/mfa/setup", json={"password": PASSWORD})
+    assert r.status_code == 403 and r.json()["error"]["code"] == "mfa_enrollment_code_required"
+    r = staff.post("/auth/mfa/setup", json={"password": PASSWORD, "enrollment_code": "AAAA-BBBB-CCCC"})
+    assert r.status_code == 403
+    setup = staff.post("/auth/mfa/setup", json={"password": PASSWORD, "enrollment_code": code.lower().replace("-", " ")})
+    assert setup.status_code == 200
+    totp_code = totp.code_at(setup.json()["secret"], int(time.time() // 30))
+    tokens = staff.post("/auth/mfa/confirm", json={"code": totp_code}).json()
+    staff.token = tokens["access_token"]
+    assert staff.get("/admin/verifications").status_code == 200
+    # Members still enrol with just their password, and admins without an MFA session cannot issue codes.
+    assert member.post("/auth/mfa/setup", json={"password": PASSWORD}).status_code == 200
+    r = admin.post(f"/admin/users/{staff.id}/mfa-enrollment-code")
+    assert r.status_code == 403
+
+
+def test_enrolment_code_is_single_use_and_expires(make_user, db):
+    from datetime import timedelta
+
+    from app.core import mfa_enrollment
+    from app.models.entities import User
+    staff = make_user(Role.reviewer, "Code Holder")
+    u = db.get(User, staff.id)
+    code, expires = mfa_enrollment.issue(u)
+    assert mfa_enrollment.check(u, code) and mfa_enrollment.check(u, code.replace("-", "").lower())
+    assert not mfa_enrollment.check(u, code, now=expires + timedelta(seconds=1))
+    mfa_enrollment.clear(u)
+    assert not mfa_enrollment.check(u, code)
+
+
+def test_cli_issues_code_for_staff_only(make_user, capsys):
+    from app.staff_mfa_code import main
+    staff = make_user(Role.admin, "Bootstrap Admin")
+    member = make_user()
+    assert main([staff.email]) == 0
+    assert len(capsys.readouterr().out.split()[0]) == 14  # XXXX-XXXX-XXXX
+    assert main([member.email]) == 1
+    assert main([]) == 2

@@ -297,6 +297,26 @@ export interface paths {
         patch: operations["update_user_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/admin/users/{user_id}/mfa-enrollment-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Mfa Enrollment Code
+         * @description One-time code a staff member needs to enrol MFA (shown once; give it to them out of band).
+         */
+        post: operations["issue_mfa_enrollment_code_admin_users__user_id__mfa_enrollment_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/verifications": {
         parameters: {
             query?: never;
@@ -1657,6 +1677,8 @@ export interface components {
             identity_verified_at: string | null;
             /** Is Active */
             is_active: boolean;
+            /** Mfa Enabled At */
+            mfa_enabled_at?: string | null;
             /** Phone */
             phone: string | null;
             role: components["schemas"]["Role"];
@@ -2237,6 +2259,16 @@ export interface components {
             /** Property Ids */
             property_ids: string[];
         };
+        /** EnrollmentCodeOut */
+        EnrollmentCodeOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** EventOut */
         EventOut: {
             /** Actor Id */
@@ -2738,6 +2770,8 @@ export interface components {
         };
         /** MfaSetupIn */
         MfaSetupIn: {
+            /** Enrollment Code */
+            enrollment_code?: string | null;
             /** Password */
             password: string;
         };
@@ -4706,6 +4740,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_mfa_enrollment_code_admin_users__user_id__mfa_enrollment_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentCodeOut"];
                 };
             };
             /** @description Validation Error */

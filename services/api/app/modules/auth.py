@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.core import rate_limit, totp
+from app.core import mfa_enrollment, rate_limit, totp
 from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.db import get_db, utcnow
@@ -272,6 +272,8 @@ class MfaDisableIn(MfaCodeIn):
 
 class MfaSetupIn(BaseModel):
     password: str = Field(max_length=128)
+    # Required for staff accounts while the staff-MFA policy is on (issued by an admin).
+    enrollment_code: str | None = Field(default=None, max_length=32)
 
 
 @router.post("/mfa/setup", response_model=MfaSetupOut, tags=["me"], dependencies=[Depends(rate_limit.limit("mfa", 20, 600))])
@@ -286,6 +288,11 @@ def mfa_setup(body: MfaSetupIn, request: Request, user: User = Depends(current_u
         audit(db, "user.mfa_setup_bad_password", "user", user.id, actor_id=user.id, ip=client_ip(request))
         db.commit()
         raise Unauthorized("Invalid password", code="invalid_credentials")
+    if get_settings().require_staff_mfa and user.role != Role.member and not mfa_enrollment.check(user, body.enrollment_code):
+        # The password alone must not let someone bind their own authenticator to a staff account.
+        audit(db, "user.mfa_setup_bad_enrollment_code", "user", user.id, actor_id=user.id, ip=client_ip(request))
+        db.commit()
+        raise Forbidden("Ask an administrator for a two-factor setup code", code="mfa_enrollment_code_required")
     secret = totp.new_secret()
     user.totp_secret_encrypted = totp.encrypt_secret(secret)
     user.totp_last_counter = None
@@ -303,6 +310,7 @@ def mfa_confirm(body: MfaCodeIn, request: Request, user: User = Depends(current_
         raise ValidationFailed("Invalid code", code="mfa_invalid")
     user.totp_last_counter = counter
     user.mfa_enabled_at = utcnow()
+    mfa_enrollment.clear(user)  # one-time
     # Sessions opened before MFA (possibly by someone else) end; this one continues with fresh MFA tokens.
     for t in db.scalars(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))):
         t.revoked_at = utcnow()
