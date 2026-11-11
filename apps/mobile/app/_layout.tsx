@@ -104,6 +104,7 @@ function Navigation() {
         <Stack.Screen name="owner/listing-new" options={{ title: t("listingForm.titleNew") }} />
         <Stack.Screen name="owner/listing/[id]" options={{ title: t("manage.title") }} />
         <Stack.Screen name="owner/listing-edit/[id]" options={{ title: t("listingForm.titleEdit") }} />
+        <Stack.Screen name="owner/performance/[id]" options={{ title: t("perf.title") }} />
         <Stack.Screen name="notification-settings" options={{ title: t("notifPrefs.title") }} />
         <Stack.Screen name="verify-phone" options={{ title: t("phone.title") }} />
         <Stack.Screen name="market" options={{ title: t("market.title") }} />

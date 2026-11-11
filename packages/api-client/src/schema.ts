@@ -1615,6 +1615,8 @@ export interface components {
             break_even_cash_price: string;
             /** Cash Alternative */
             cash_alternative: string | null;
+            /** Cash Alternative All In */
+            cash_alternative_all_in: string | null;
             /** Cheaper Option */
             cheaper_option: ("installments" | "cash" | "equal") | null;
             /** Excludes Estimates And Unknowns */
@@ -1627,6 +1629,8 @@ export interface components {
             initial_cash: string;
             /** Nominal Total */
             nominal_total: string;
+            /** Other Known Costs */
+            other_known_costs: string;
             /** Present Value Difference */
             present_value_difference: string | null;
             /** Present Value Total */

@@ -818,6 +818,17 @@
       ],
       "title": "Cash Alternative"
      },
+     "cash_alternative_all_in": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash Alternative All In"
+     },
      "cheaper_option": {
       "anyOf": [
        {
@@ -854,6 +865,10 @@
       "title": "Nominal Total",
       "type": "string"
      },
+     "other_known_costs": {
+      "title": "Other Known Costs",
+      "type": "string"
+     },
      "present_value_difference": {
       "anyOf": [
        {
@@ -877,8 +892,10 @@
      "future_present_value",
      "nominal_total",
      "present_value_total",
+     "other_known_costs",
      "break_even_cash_price",
      "cash_alternative",
+     "cash_alternative_all_in",
      "cheaper_option",
      "present_value_difference",
      "excludes_estimates_and_unknowns",

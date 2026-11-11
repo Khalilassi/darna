@@ -11,7 +11,9 @@ const base: Schemas["CashComparison"] = {
   nominal_total: "12735000.00",
   present_value_total: "11158382.14",
   break_even_cash_price: "11158382.14",
+  other_known_costs: "0.00",
   cash_alternative: null,
+  cash_alternative_all_in: null,
   cheaper_option: null,
   present_value_difference: null,
   excludes_estimates_and_unknowns: true,
@@ -46,5 +48,16 @@ describe("CashComparisonResult", () => {
       <CashComparisonResult data={{ ...base, cash_alternative: "12000000", cheaper_option: "installments", present_value_difference: "841617.86" }} />,
     );
     expect(screen.getByTestId("cmp-cheaper-installments")).toHaveTextContent(/costs about EGP\s?841,618 less/);
+  });
+
+  it("adds maintenance and fees to the cash offer when the buyer pays them in both options", async () => {
+    await render(
+      <CashComparisonResult
+        data={{ ...base, other_known_costs: "859000.00", break_even_cash_price: "10299382.14", cash_alternative: "10000000.00",
+                cash_alternative_all_in: "10859000.00", cheaper_option: "cash", present_value_difference: "-299382.14" }}
+      />,
+    );
+    expect(screen.getByTestId("cmp-other-costs")).toHaveTextContent(/EGP\s?859,000/);
+    expect(screen.getByTestId("cmp-cheaper-cash")).toHaveTextContent(/EGP\s?10,859,000/);
   });
 });

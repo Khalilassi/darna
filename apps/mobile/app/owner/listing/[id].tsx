@@ -9,7 +9,7 @@ import { api, unwrap } from "../../../src/api/client";
 import { errorMessage } from "../../../src/api/errors";
 import { qk, useMyListing, useVerifications } from "../../../src/api/queries";
 import {
-  Badge, Button, Card, DocumentUploader, ErrorState, IconButton, KeyValue, LoadingState, Notice, PriceBreakdown, Row, Screen, Section, SignInRequired, T,
+  Badge, Button, Card, DocumentUploader, ErrorState, Icon, IconButton, KeyValue, LoadingState, Notice, PriceBreakdown, Row, Screen, Section, SignInRequired, T,
 } from "../../../src/components";
 import { mediaUrl } from "../../../src/config";
 import { formatDate, formatNumber } from "../../../src/i18n/format";
@@ -134,6 +134,16 @@ function Manage() {
             </View>
           ))}
         </View>
+        <Card onPress={() => router.push(`/owner/performance/${l.id}`)} accessibilityLabel={t("manage.openPerformance")} testID="open-performance">
+          <Row>
+            <Icon name="stats-chart-outline" size={22} color={colors.primary} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <T variant="bodyStrong">{t("manage.openPerformance")}</T>
+              <T variant="caption" tone="muted">{t("manage.openPerformanceBody")}</T>
+            </View>
+            <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+          </Row>
+        </Card>
       </Section>
 
       <Section title={t("manage.photos")} action={editable ? <Button title={t("manage.addPhoto")} size="sm" icon="camera-outline" onPress={() => addPhoto.mutate()} loading={addPhoto.isPending} testID="add-photo" /> : undefined}>

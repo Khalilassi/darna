@@ -179,9 +179,10 @@ export function usePriceHistory(id: string) {
   });
 }
 
-export function useMarketSummary(projectId: string | undefined, purpose: "sale" | "rent", propertyTypes: Schemas["PropertyType"][]) {
+export function useMarketSummary(projectId: string | undefined, purpose: "sale" | "rent", propertyTypes: Schemas["PropertyType"][], lang: string) {
   return useQuery({
-    queryKey: qk.market(projectId ?? "", purpose, propertyTypes),
+    // The methodology text is localized by the server (Accept-Language), so the language is part of the key.
+    queryKey: [...qk.market(projectId ?? "", purpose, propertyTypes), lang],
     enabled: !!projectId,
     staleTime: 5 * 60_000,
     queryFn: async () =>
@@ -190,9 +191,9 @@ export function useMarketSummary(projectId: string | undefined, purpose: "sale" 
 }
 
 /** Cash vs installments comparison; `discountRate` is a fraction (0.2 = 20%). Disabled until a rate is set. */
-export function useCashComparison(listingId: string, discountRate: number | null, cashPrice: number | null) {
+export function useCashComparison(listingId: string, discountRate: number | null, cashPrice: number | null, lang: string) {
   return useQuery({
-    queryKey: ["listing", listingId, "compare", discountRate, cashPrice],
+    queryKey: ["listing", listingId, "compare", discountRate, cashPrice, lang], // assumption text is localized
     enabled: discountRate !== null,
     queryFn: async () =>
       unwrap(

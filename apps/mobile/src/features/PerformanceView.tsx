@@ -118,9 +118,9 @@ export function PerformanceView({ data }: { data: Performance }) {
             <T variant="caption" tone="muted">{t("perf.funnelBody")}</T>
             {data.funnel.map((s, i) => {
               const name = (METRICS as string[]).includes(s.step) ? t(`perf.metric.${s.step}`) : s.step;
-              const rate = s.rate_from_previous === null ? t("perf.noRate") : formatPercent(s.rate_from_previous, lang);
+              const rate = s.rate_from_previous === null ? t("perf.noRate") : t("perf.stepRate", { rate: formatPercent(s.rate_from_previous, lang) });
               return (
-                <View key={s.step} style={styles.step} testID={`perf-step-${s.step}`} accessible accessibilityLabel={`${name}: ${n(s.count)}${i ? `, ${t("perf.stepRate", { rate })}` : ""}`}>
+                <View key={s.step} style={styles.step} testID={`perf-step-${s.step}`} accessible accessibilityLabel={`${name}: ${n(s.count)}${i ? `, ${rate}` : ""}`}>
                   <View style={styles.stepHead}>
                     <T variant="bodyStrong" style={styles.flex}>{name}</T>
                     <T variant="bodyStrong" testID={`perf-step-${s.step}-count`}>{n(s.count)}</T>
@@ -128,7 +128,7 @@ export function PerformanceView({ data }: { data: Performance }) {
                   <View style={[styles.track, { backgroundColor: colors.surfaceMuted, borderRadius: radii.pill }]}>
                     <View style={{ width: `${Math.round((s.count / maxFunnel) * 100)}%`, height: "100%", backgroundColor: colors.primary, borderRadius: radii.pill }} />
                   </View>
-                  {i ? <T variant="caption" tone="muted" testID={`perf-step-${s.step}-rate`}>{t("perf.stepRate", { rate })}</T> : null}
+                  {i ? <T variant="caption" tone="muted" testID={`perf-step-${s.step}-rate`}>{rate}</T> : null}
                 </View>
               );
             })}

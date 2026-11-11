@@ -38,10 +38,23 @@ export function CashComparisonResult({ data }: { data: Comparison }) {
         <T variant="caption" tone="muted">{t("cashCmp.breakEven")}</T>
         <T variant="title" testID="cmp-break-even">{formatMoney(data.break_even_cash_price, lang)}</T>
         <T variant="caption" tone="muted">{t("cashCmp.breakEvenHelp", { rate })}</T>
+        {(toNumber(data.other_known_costs) ?? 0) > 0 ? (
+          <T variant="caption" tone="muted" testID="cmp-other-costs">
+            {t("cashCmp.otherCostsHelp", { amount: formatMoney(data.other_known_costs, lang) })}
+          </T>
+        ) : null}
       </View>
       {verdict ? (
         <Notice tone={verdict.tone} title={t(`cashCmp.cheaper.${data.cheaper_option}`)} testID={`cmp-cheaper-${data.cheaper_option}`}>
-          {`${t("cashCmp.yourCash", { amount: formatMoney(data.cash_alternative, lang) })} ${verdict.text}`}
+          {`${
+            (toNumber(data.other_known_costs) ?? 0) > 0
+              ? t("cashCmp.yourCashAllIn", {
+                  amount: formatMoney(data.cash_alternative, lang),
+                  other: formatMoney(data.other_known_costs, lang),
+                  allIn: formatMoney(data.cash_alternative_all_in, lang),
+                })
+              : t("cashCmp.yourCash", { amount: formatMoney(data.cash_alternative, lang) })
+          } ${verdict.text}`}
         </Notice>
       ) : null}
       <Divider />
@@ -68,7 +81,7 @@ export function CashComparisonTool({ listingId }: { listingId: string }) {
   const [cashText, setCashText] = useState("");
   const [params, setParams] = useState<{ rate: number; cash: number | null } | null>(null);
   const [errors, setErrors] = useState<{ rate?: string; cash?: string }>({});
-  const q = useCashComparison(listingId, params?.rate ?? null, params?.cash ?? null);
+  const q = useCashComparison(listingId, params?.rate ?? null, params?.cash ?? null, lang);
 
   const parseCash = (): number | null | "invalid" => {
     if (!cashText.trim()) return null;
