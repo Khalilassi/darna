@@ -22,6 +22,7 @@ npm run e2e -w @darna/admin       # Playwright smoke against running app + API (
 ## Pages
 Dashboard (analytics, "Expire stale offers"), Verification queue (filters, detail panel, signed-URL documents, decisions,
 ownership supersede with warning), Listings moderation, Disputes (existing vs challenger), Duplicate candidates, Users
-(search, role, suspend/reactivate with reason), Deals monitor, Support cases, Audit log.
+(search, role, suspend/reactivate with reason), Deals monitor, Support cases, Service providers (create/edit, verify,
+activate; `services.manage` = admin + support), Referral requests (status filter, contacted/completed/cancelled), Audit log.
 
 Screenshots: `docs/screenshots/`.
