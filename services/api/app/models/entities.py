@@ -74,6 +74,10 @@ def _in_list(values) -> str:
 # --------------------------------------------------------------------------- users & auth
 class User(IdMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    # A verified phone number belongs to one account only.
+    __table_args__ = (
+        Index("uq_users_verified_phone", "phone", unique=True, postgresql_where=text("phone_verified_at IS NOT NULL")),
+    )
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(32))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -84,6 +88,7 @@ class User(IdMixin, TimestampMixin, Base):
     # Broker exclusion: users attest at sign-up that they are not acting as a broker.
     not_broker_attested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     identity_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     suspended_reason: Mapped[str | None] = mapped_column(String(500))
     # Per-category notification preferences, e.g. {"push": {"messages": true, "offers": true, ...}}
     notification_prefs: Mapped[dict] = mapped_column(Json, default=dict, server_default="{}")
@@ -91,6 +96,19 @@ class User(IdMixin, TimestampMixin, Base):
     totp_secret_encrypted: Mapped[str | None] = mapped_column(String(300))
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     totp_last_counter: Mapped[int | None] = mapped_column(Integer)
+
+
+class PhoneVerification(IdMixin, Base):
+    """One SMS code challenge. Only a keyed hash of the code is stored."""
+
+    __tablename__ = "phone_verifications"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    phone: Mapped[str] = mapped_column(String(32))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class DeviceToken(IdMixin, Base):

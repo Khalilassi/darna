@@ -79,6 +79,7 @@ class MeOut(ORM):
     locale: str
     role: Role
     identity_verified_at: datetime | None
+    phone_verified_at: datetime | None
     mfa_enabled_at: datetime | None
     created_at: datetime
 
@@ -243,6 +244,8 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> MeD
 def update_me(body: MeUpdate, user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     for k, v in body.model_dump(exclude_unset=True).items():
         if v is not None:
+            if k == "phone" and v != user.phone:
+                user.phone_verified_at = None  # a changed number must be verified again
             setattr(user, k, v)
     db.commit()
     return user

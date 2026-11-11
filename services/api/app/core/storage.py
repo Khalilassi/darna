@@ -21,10 +21,10 @@ import secrets
 from pathlib import Path
 from typing import Protocol
 
-from cryptography.fernet import Fernet
 from PIL import Image, UnidentifiedImageError
 
 from app.core.config import get_settings
+from app.core.crypto import multi_fernet
 from app.core.errors import ValidationFailed
 
 ALLOWED_DOC_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
@@ -72,6 +72,7 @@ class PrivateStorage(Protocol):
     def put(self, data: bytes) -> str: ...
     def get(self, key: str) -> bytes: ...
     def delete(self, key: str) -> None: ...
+    def rotate(self, key: str) -> None: ...
 
 
 class PublicStorage(Protocol):
@@ -85,7 +86,7 @@ class LocalEncryptedStorage:
     def __init__(self, root: Path, key: str):
         self.root = root / "private"
         self.root.mkdir(parents=True, exist_ok=True)
-        self.fernet = Fernet(key.encode())
+        self.fernet = multi_fernet(key)
 
     def _path(self, key: str) -> Path:
         return self.root / _check_key(key)
@@ -100,6 +101,11 @@ class LocalEncryptedStorage:
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
+
+    def rotate(self, key: str) -> None:
+        """Re-encrypt one object with the primary key (no-op content-wise; readable before and after)."""
+        p = self._path(key)
+        p.write_bytes(self.fernet.rotate(p.read_bytes()))
 
 
 class PublicMediaStorage:
@@ -131,7 +137,7 @@ def _s3_client():
 class S3EncryptedStorage:
     def __init__(self, bucket: str, key: str, prefix: str = "documents/", kms_key_id: str | None = None, client=None):
         self.bucket, self.prefix, self.kms_key_id = bucket, prefix, kms_key_id
-        self.fernet = Fernet(key.encode())
+        self.fernet = multi_fernet(key)
         self.client = client or _s3_client()
 
     def _obj(self, key: str) -> str:
@@ -154,6 +160,11 @@ class S3EncryptedStorage:
 
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=self._obj(key))
+
+    def rotate(self, key: str) -> None:
+        body = self.client.get_object(Bucket=self.bucket, Key=self._obj(key))["Body"].read()
+        self.client.put_object(Bucket=self.bucket, Key=self._obj(key), Body=self.fernet.rotate(body),
+                               ContentType="application/octet-stream", **self._sse())
 
 
 class S3PublicMediaStorage:

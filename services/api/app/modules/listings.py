@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from app.core.db import get_db, utcnow
 from app.core.deps import client_ip, current_user, current_user_optional
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from app.core.scanning import ensure_clean
 from app.core.state_machine import StateMachine
 from app.core.storage import public_storage
 from app.finance.engine import (
@@ -477,6 +478,7 @@ async def upload_photo(listing_id: uuid.UUID, file: UploadFile = File(...), user
     data = await file.read(get_settings().max_upload_bytes + 1)
     if len(data) > get_settings().max_upload_bytes:
         raise ValidationFailed("File too large", code="file_too_large")
+    ensure_clean(data)
     key, w, h = public_storage().put_image(data)
     photo = ListingPhoto(listing_id=listing.id, storage_key=key, width=w, height=h, position=count)
     db.add(photo)

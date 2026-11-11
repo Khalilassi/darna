@@ -49,7 +49,16 @@ class Settings(BaseSettings):
         "http://localhost:19006",
     ]
     rate_limit_enabled: bool = True
+    rate_limit_backend: str = "memory"  # memory | redis
+    redis_url: str = "redis://localhost:6379/0"
     offer_default_expiry_hours: int = 72
+
+    malware_scanner: str = "none"  # none | clamd
+    clamd_host: str = "localhost"
+    clamd_port: int = 3310
+    scan_fail_open: bool = False
+
+    sms_provider: str = "log"  # log (development only) | <real provider, not implemented>
 
     push_provider: str = "log"  # log | expo
     expo_access_token: str | None = None
@@ -57,10 +66,18 @@ class Settings(BaseSettings):
     require_staff_mfa: bool = False
 
     def validate_for_env(self) -> None:
+        from app.core.crypto import parse_keys
+
+        try:
+            keys = parse_keys(self.document_encryption_key)
+        except ValueError as exc:
+            raise RuntimeError(f"DARNA_DOCUMENT_ENCRYPTION_KEY is invalid: {exc}") from exc
         if self.env in {"staging", "production"}:
             if self.jwt_secret == DEV_SECRET or len(self.jwt_secret) < 32:
                 raise RuntimeError("DARNA_JWT_SECRET must be set to a strong secret outside development")
-            if self.document_encryption_key == DEV_FERNET_KEY:
+            if self.malware_scanner == "none":
+                raise RuntimeError("DARNA_MALWARE_SCANNER must be configured (clamd) outside development")
+            if DEV_FERNET_KEY in keys:
                 raise RuntimeError("DARNA_DOCUMENT_ENCRYPTION_KEY must be set outside development")
         if self.storage_backend not in {"local", "s3"}:
             raise RuntimeError("DARNA_STORAGE_BACKEND must be 'local' or 's3'")

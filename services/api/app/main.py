@@ -21,6 +21,7 @@ from app.modules import (
     market,
     messaging,
     notifications,
+    phone,
     properties,
     saved_searches,
     support,
@@ -61,7 +62,7 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
-    for r in (auth, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
+    for r in (auth, phone, catalog, documents, verification, properties, market, listings, messaging, viewings, deals, notifications, saved_searches, support, admin):
         app.include_router(r.router)
 
     if settings.storage_backend == "local":  # with s3, photos are served by the CDN / bucket

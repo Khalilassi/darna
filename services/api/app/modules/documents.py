@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.db import get_db, utcnow
 from app.core.deps import PERMISSIONS, client_ip, current_user
 from app.core.errors import Forbidden, NotFound, ValidationFailed
+from app.core.scanning import ensure_clean
 from app.core.security import sha256_hex, sign_document_access, verify_document_access
 from app.core.storage import ALLOWED_DOC_TYPES, private_storage, sniff_type
 from app.models.entities import ChecklistItem, Deal, Document, User
@@ -83,6 +84,7 @@ async def upload(
     ctype = sniff_type(data)  # trust content, not the client-declared type
     if ctype not in ALLOWED_DOC_TYPES:
         raise ValidationFailed("Only PDF, JPEG, PNG or WEBP files are accepted", code="unsupported_file_type")
+    ensure_clean(data)
     key = private_storage().put(data)
     doc = Document(
         owner_id=user.id, kind=kind, storage_key=key, original_name=(file.filename or "document")[:200],
