@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { brand } from "@darna/design-tokens";
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
+import { safeNextPath } from "@/lib/safeRedirect";
 
 export default function LoginPage() {
   const { login, status } = useAuth();
@@ -14,10 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const next = () => {
-    const n = new URLSearchParams(window.location.search).get("next");
-    return n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
-  };
+  const next = () => safeNextPath(new URLSearchParams(window.location.search).get("next"), window.location.origin);
 
   useEffect(() => {
     if (status === "authenticated") router.replace(next());

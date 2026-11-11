@@ -24,7 +24,7 @@ function OfferScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const listing = useListing(listingId);
-  const keyFor = useIdempotencyKeys();
+  const withKey = useIdempotencyKeys();
   const [kind, setKind] = useState<Schemas["DealKind"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,8 @@ function OfferScreen() {
     setFe({});
     const body: Schemas["OfferIn"] = { listing_id: l.id, kind: active, ...p };
     try {
-      const deal = unwrap(await api.POST("/deals/offers", { params: { header: { "idempotency-key": keyFor("offer", body) } }, body }));
+      const deal = await withKey("offer", body, async (key) =>
+        unwrap(await api.POST("/deals/offers", { params: { header: { "idempotency-key": key } }, body })));
       void qc.invalidateQueries({ queryKey: qk.deals });
       void qc.invalidateQueries({ queryKey: qk.listing(l.id) });
       router.replace(`/deal/${deal.id}`);

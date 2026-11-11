@@ -39,16 +39,25 @@ describe("i18n & RTL helpers", () => {
     expect(mirrorTransform(false)).toEqual([]);
   });
 
-  it("forces native RTL and asks for a reload only when direction changes", () => {
+  it("persists native direction for both languages and asks for a reload only when it changes", () => {
     const force = jest.spyOn(I18nManager, "forceRTL").mockImplementation(() => undefined);
-    jest.spyOn(I18nManager, "allowRTL").mockImplementation(() => undefined);
+    const allow = jest.spyOn(I18nManager, "allowRTL").mockImplementation(() => undefined);
     jest.spyOn(I18nManager, "swapLeftAndRightInRTL").mockImplementation(() => undefined);
     const rtl = I18nManager.isRTL;
     expect(applyDirection(rtl ? "en" : "ar", "ios")).toBe(true);
-    expect(force).toHaveBeenCalledWith(!rtl);
-    force.mockClear();
+    expect(force).toHaveBeenLastCalledWith(!rtl);
+    expect(allow).toHaveBeenLastCalledWith(!rtl);
     expect(applyDirection(rtl ? "ar" : "en", "ios")).toBe(false);
-    expect(force).not.toHaveBeenCalled();
+    expect(force).toHaveBeenLastCalledWith(rtl);
+    expect(allow).toHaveBeenLastCalledWith(rtl);
+  });
+
+  it("disallows RTL when English is chosen on an RTL device so the device locale cannot keep layouts mirrored", () => {
+    const allow = jest.spyOn(I18nManager, "allowRTL").mockImplementation(() => undefined);
+    jest.spyOn(I18nManager, "forceRTL").mockImplementation(() => undefined);
+    jest.spyOn(I18nManager, "swapLeftAndRightInRTL").mockImplementation(() => undefined);
+    applyDirection("en", "android");
+    expect(allow).toHaveBeenLastCalledWith(false);
   });
 
   it("has an Arabic string for every English key, with Arabic plurals and digits", () => {

@@ -71,7 +71,7 @@ class UserUpdate(BaseModel):
 
 
 @router.get("/users", response_model=Page[AdminUserOut])
-def users(q: str | None = Query(default=None, max_length=80), page: int = Query(1, ge=1), page_size: int = Query(25, le=100),
+def users(q: str | None = Query(default=None, max_length=80), page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
           _: User = Depends(require("user.manage")), db: Session = Depends(get_db)):
     stmt = select(User)
     if q:
@@ -261,7 +261,7 @@ class ModerateIn(BaseModel):
 
 
 @router.get("/listings", response_model=Page[AdminListingOut])
-def admin_listings(status: list[ListingStatus] = Query(default=[]), page: int = Query(1, ge=1), page_size: int = Query(25, le=100),
+def admin_listings(status: list[ListingStatus] = Query(default=[]), page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
                    _: User = Depends(require("listing.moderate")), db: Session = Depends(get_db)):
     stmt = select(Listing).options(joinedload(Listing.owner), joinedload(Listing.property), joinedload(Listing.photos))
     if status:
@@ -512,7 +512,7 @@ class AuditOut(ORM):
 
 @router.get("/audit", response_model=Page[AuditOut])
 def audit_logs(action: str | None = Query(default=None, max_length=80), entity_id: str | None = Query(default=None, max_length=64),
-               page: int = Query(1, ge=1), page_size: int = Query(50, le=200),
+               page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
                _: User = Depends(require("audit.read")), db: Session = Depends(get_db)):
     stmt = select(AuditLog)
     if action:

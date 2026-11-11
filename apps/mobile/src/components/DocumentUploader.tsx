@@ -58,7 +58,7 @@ export function DocumentUploader({
             <T variant="bodyStrong" numberOfLines={1}>{t(`enum.documentKind.${d.kind}`)}</T>
             <T variant="caption" tone="muted" numberOfLines={1}>{d.original_name}</T>
           </View>
-          <IconButton icon="close" label={`${t("common.remove")} ${d.original_name}`} onPress={() => onChange(docs.filter((x) => x.id !== d.id))} />
+          <IconButton icon="close" label={`${t("common.remove")} ${d.original_name}`} disabled={busy} onPress={() => onChange(docs.filter((x) => x.id !== d.id))} />
         </View>
       ))}
       {uploadError || error ? <T variant="caption" tone="danger">{uploadError ?? error}</T> : null}

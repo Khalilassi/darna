@@ -21,13 +21,12 @@ export function applyDirection(lang: Language, platform: string = Platform.OS): 
     }
     return false;
   }
-  I18nManager.allowRTL(true);
+  // forceRTL(false) alone does not override an RTL device locale while RTL is allowed, so English
+  // must also disallow RTL; otherwise the layout stays mirrored and the startup check loops on reloads.
+  I18nManager.allowRTL(rtl);
+  I18nManager.forceRTL(rtl);
   I18nManager.swapLeftAndRightInRTL(true);
-  if (I18nManager.isRTL !== rtl) {
-    I18nManager.forceRTL(rtl);
-    return true;
-  }
-  return false;
+  return I18nManager.isRTL !== rtl;
 }
 
 /** Icons that imply direction (chevrons, arrows) must be mirrored in RTL. */

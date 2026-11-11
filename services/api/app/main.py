@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.core import logging_filters
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import install_error_handlers
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     install_error_handlers(app)
+    logging_filters.install()  # signed document tokens must never land in access logs
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

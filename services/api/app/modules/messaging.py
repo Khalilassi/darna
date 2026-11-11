@@ -120,7 +120,7 @@ def my_conversations(user: User = Depends(current_user), db: Session = Depends(g
 
 
 @router.get("/{conversation_id}/messages", response_model=list[MessageOut])
-def messages(conversation_id: uuid.UUID, before: datetime | None = None, limit: int = Query(default=50, le=100),
+def messages(conversation_id: uuid.UUID, before: datetime | None = None, limit: int = Query(default=50, ge=1, le=100),
              user: User = Depends(current_user), db: Session = Depends(get_db)):
     conv = db.get(Conversation, conversation_id)
     if conv is None:

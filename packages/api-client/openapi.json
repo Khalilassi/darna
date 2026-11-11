@@ -6173,6 +6173,7 @@
       "schema": {
        "default": 50,
        "maximum": 200,
+       "minimum": 1,
        "title": "Page Size",
        "type": "integer"
       }
@@ -6450,6 +6451,7 @@
       "schema": {
        "default": 25,
        "maximum": 100,
+       "minimum": 1,
        "title": "Page Size",
        "type": "integer"
       }
@@ -6727,6 +6729,7 @@
       "schema": {
        "default": 25,
        "maximum": 100,
+       "minimum": 1,
        "title": "Page Size",
        "type": "integer"
       }
@@ -7425,6 +7428,7 @@
       "schema": {
        "default": 50,
        "maximum": 100,
+       "minimum": 1,
        "title": "Limit",
        "type": "integer"
       }
@@ -9409,6 +9413,7 @@
       "schema": {
        "default": 50,
        "maximum": 100,
+       "minimum": 1,
        "title": "Limit",
        "type": "integer"
       }

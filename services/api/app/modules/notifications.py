@@ -30,7 +30,7 @@ class NotificationList(BaseModel):
 
 
 @router.get("", response_model=NotificationList)
-def list_notifications(limit: int = Query(default=50, le=100), user: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_notifications(limit: int = Query(default=50, ge=1, le=100), user: User = Depends(current_user), db: Session = Depends(get_db)):
     items = db.scalars(select(Notification).where(Notification.user_id == user.id).order_by(Notification.created_at.desc()).limit(limit)).all()
     unread = db.scalar(select(func.count()).select_from(Notification).where(Notification.user_id == user.id, Notification.read_at.is_(None))) or 0
     return NotificationList(items=[NotificationOut.model_validate(i) for i in items], unread=unread)

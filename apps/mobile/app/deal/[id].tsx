@@ -73,7 +73,7 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
   const router = useRouter();
   const qc = useQueryClient();
   const { colors } = useTheme();
-  const keyFor = useIdempotencyKeys();
+  const withKey = useIdempotencyKeys();
   const [mode, setMode] = useState<"none" | "counter" | "new">("none");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -101,20 +101,22 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
   const respond = useMutation({
     mutationFn: async ({ offerId, action }: { offerId: string; action: Schemas["RespondIn"]["action"] }) => {
       const body = { action };
-      return unwrap(await api.POST("/deals/{deal_id}/offers/{offer_id}/respond", {
-        params: { path: { deal_id: d.id, offer_id: offerId }, header: { "idempotency-key": keyFor(`respond.${offerId}`, body) } },
-        body,
-      }));
+      return withKey(`respond.${offerId}`, body, async (key) =>
+        unwrap(await api.POST("/deals/{deal_id}/offers/{offer_id}/respond", {
+          params: { path: { deal_id: d.id, offer_id: offerId }, header: { "idempotency-key": key } },
+          body,
+        })));
     },
     onSuccess: onDone,
     onError: onFail,
   });
   const counter = useMutation({
-    mutationFn: async ({ offerId, p }: { offerId: string; p: OfferPayload }) =>
-      unwrap(await api.POST("/deals/{deal_id}/offers/{offer_id}/counter", {
-        params: { path: { deal_id: d.id, offer_id: offerId }, header: { "idempotency-key": keyFor(`counter.${offerId}`, p) } },
-        body: p,
-      })),
+    mutationFn: ({ offerId, p }: { offerId: string; p: OfferPayload }) =>
+      withKey(`counter.${offerId}`, p, async (key) =>
+        unwrap(await api.POST("/deals/{deal_id}/offers/{offer_id}/counter", {
+          params: { path: { deal_id: d.id, offer_id: offerId }, header: { "idempotency-key": key } },
+          body: p,
+        }))),
     onSuccess: (n) => {
       setMode("none");
       onDone(n);
@@ -124,7 +126,8 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
   const newOffer = useMutation({
     mutationFn: async (p: OfferPayload) => {
       const body: Schemas["OfferIn"] = { listing_id: d.listing_id, kind: d.kind, ...p };
-      return unwrap(await api.POST("/deals/offers", { params: { header: { "idempotency-key": keyFor("offer", body) } }, body }));
+      return withKey("offer", body, async (key) =>
+        unwrap(await api.POST("/deals/offers", { params: { header: { "idempotency-key": key } }, body })));
     },
     onSuccess: (n) => {
       setMode("none");
@@ -135,10 +138,11 @@ function DealView({ deal: d, refreshing, onRefresh }: { deal: Deal; refreshing: 
   const advance = useMutation({
     mutationFn: async (target: Schemas["DealStatus"]) => {
       const body = { target };
-      return unwrap(await api.POST("/deals/{deal_id}/advance", {
-        params: { path: { deal_id: d.id }, header: { "idempotency-key": keyFor(`advance.${d.status}`, body) } },
-        body,
-      }));
+      return withKey(`advance.${d.status}`, body, async (key) =>
+        unwrap(await api.POST("/deals/{deal_id}/advance", {
+          params: { path: { deal_id: d.id }, header: { "idempotency-key": key } },
+          body,
+        })));
     },
     onSuccess: onDone,
     onError: onFail,
