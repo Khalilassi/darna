@@ -1,5 +1,5 @@
 pytest==9.2.0
-ruff==0.17.4
+ruff==0.17.5
 moto[s3]==5.2.5
 fakeredis[lua]==2.40.0
 pip-audit==2.10.1
