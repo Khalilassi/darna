@@ -4,7 +4,7 @@ cryptography==50.0.2
 email-validator==2.3.0
 fastapi==0.162.4
 pillow==13.0.0
-psycopg==3.3.8
+psycopg==3.3.9
 psycopg-binary==3.3.8
 pydantic==2.14.3
 pydantic-settings==2.16.2
